@@ -1,0 +1,686 @@
+# Sesión de brainstorming — TFM RAG Chatbot Platform
+# Fecha: 2026-05-19
+# Usuario: Ade Cabo Cuartero <ade.cabo@kenmei.ai>
+# Asistente: Claude Opus 4.7 (1M context)
+# Repo: github.com:andnife/tfm-rag-chatbot-deploy-tool
+# Working dir: /home/acabo/personal/tfmragapp/tfm-rag-chatbot-deploy-tool
+
+================================================================================
+OBJETIVO DE LA SESIÓN
+================================================================================
+
+Partiendo de la memoria académica del TFM (docs/TFM - Segunda entrega - Ade Cabo
+Cuartero.pdf) y de una descripción general previa del usuario, producir un
+documento HTML autocontenido que:
+
+  1. Sirva como spec ejecutable para agentes que implementen el MVP.
+  2. Permita extraer de él OpenSpec proposals (cada capability = 1 proposal).
+  3. Cubra el journey completo del usuario (desde docker up hasta widget en
+     web del cliente final) y todos los módulos necesarios para que ese
+     journey funcione.
+  4. Combine especificación funcional detallada por módulo + roadmap por
+     hitos end-to-end (M1–M7).
+
+================================================================================
+CONTEXTO INICIAL (de la memoria del TFM, fase ya cerrada)
+================================================================================
+
+- Producto: plataforma open-source, autoalojable, modular, para crear y
+  desplegar chatbots RAG de atención al cliente sin programar.
+- Arquitectura: puertos y adaptadores (hexagonal).
+- Puertos principales: LLMProvider, EmbeddingProvider, VectorStore, DataSource,
+  Chunker, Router.
+- Stack: Python + FastAPI, Next.js, Qdrant, PostgreSQL, Ollama + endpoints
+  OpenAI-compatibles, Docker Compose, pytest.
+- Evaluación: RAGAS (Context Precision/Recall, Faithfulness, Answer Relevancy)
+  sobre 3 escenarios (docs semánticos, text-to-SQL, multi-fuente con router).
+- Calendario implementación: 05/05/2026 – 06/07/2026 (~9 semanas).
+- Licencia: AGPLv3.
+
+================================================================================
+TRANSCRIPCIÓN DE LA CONVERSACIÓN (resumida con todas las decisiones)
+================================================================================
+
+--------------------------------------------------------------------------------
+TURNO 1 — Usuario
+--------------------------------------------------------------------------------
+Solicitud previa (resolución técnica): clonar el repo
+git@github.com:andnife/tfm-rag-chatbot-deploy-tool.git usando la clave SSH
+personal (~/.ssh/id_ed25519_github_personal) vía el alias `github.com-personal`
+del ~/.ssh/config.
+
+Acción tomada: `git clone git@github.com-personal:andnife/...` en el cwd.
+Repo clonado correctamente.
+
+--------------------------------------------------------------------------------
+TURNO 2 — Usuario
+--------------------------------------------------------------------------------
+"mira @docs/TFM - Segunda entrega - Ade Cabo Cuartero.pdf y teniendo en cuenta
+esto (que escribí hace tiempo) [descripción general del proyecto: chatbots RAG
+agnósticos al proveedor, modulares, con panel para usuario no técnico, widget
+embebible, etc.] haz un roadmap de features o un documento funcional
+específico, basicamente quiero tener las bases del proyecto bien definidas
+para facilitar el desarrollo posteriormente. que el output sea en html.
+hazme las preguntas que necesites"
+
+Acción tomada por el asistente:
+- Lectura del PDF (67 páginas) mediante PyMuPDF.
+- Lectura del README (mínimo).
+- Invocación de la skill `superpowers:brainstorming`.
+
+--------------------------------------------------------------------------------
+RONDA 1 DE PREGUNTAS
+--------------------------------------------------------------------------------
+Q1: ¿Tipo de documento entregable?
+    Opciones: funcional detallado por módulo / roadmap temporal con hitos /
+    ambos en uno.
+R1: AMBOS EN UN ÚNICO DOCUMENTO.
+
+--------------------------------------------------------------------------------
+RONDA 2 DE PREGUNTAS
+--------------------------------------------------------------------------------
+Q2.1: Modelo de autenticación / propiedad de chatbots.
+      Opciones: single-tenant 1 admin / multi-usuario en una org / multi-tenant
+      real.
+R2.1: MULTI-TENANT REAL. Aislamiento por tenant.
+
+Q2.2: Nivel de detalle de contratos de puertos.
+      Opciones: firmas Python completas / descripción funcional en prosa / sólo
+      nombres.
+R2.2: FIRMAS PYTHON COMPLETAS.
+
+Q2.3: Widget embebible dentro o fuera del MVP.
+R2.3: DENTRO del MVP, pero el widget JS es un artefacto separado de la
+      aplicación. El panel debe incluir un configurador (colores, título,
+      tamaños) con preview en vivo y generar un snippet copiable.
+
+Q2.4: Configurabilidad del pipeline RAG en el panel.
+      Opciones: completa con defaults / mínima (sólo modelo+fuentes) / avanzada
+      con presets.
+R2.4: AVANZADA CON PRESETS (modo Simple + modo Avanzado).
+
+--------------------------------------------------------------------------------
+RONDA 3 DE PREGUNTAS
+--------------------------------------------------------------------------------
+Q3.1: Cómo entran archivos al sistema.
+R3.1: UPLOAD DIRECTO DESDE PANEL + CONECTOR DE NUBE (Google Drive / S3 /
+      Dropbox).
+
+Q3.2: Procesamiento asíncrono de ingesta.
+R3.2: BackgroundTasks de FastAPI + tabla `ingestion_jobs` con polling.
+      (Sin Celery/Redis en MVP.)
+
+Q3.3: Formato del HTML.
+R3.3: Autocontenido con estilo propio y nav lateral, sin extravagancias.
+      Uso doble: que el usuario visualice info Y que agentes implementen el
+      MVP a partir de él. ESPEC EJECUTABLE: dependencias claras, flujo de la
+      aplicación, profundidad y fronteras de cada módulo.
+
+Q3.4: Granularidad del roadmap temporal.
+R3.4: POR HITOS DE FUNCIONALIDAD END-TO-END (M1, M2, ..., Mn) demo-ables, no
+      por semana de calendario.
+
+--------------------------------------------------------------------------------
+RONDA 4 DE PREGUNTAS
+--------------------------------------------------------------------------------
+Q4.1: Conversación multi-turno o stateless.
+R4.1: MULTI-TURNO CON HISTORIAL PERSISTIDO. Cada sesión con `session_id` en BD,
+      los últimos N turnos se pasan como contexto al LLM.
+
+Q4.2: Layout del repo.
+R4.2: `backend/` y `frontend/` en dos carpetas. Sin monorepo packages/.
+
+Q4.3: Edición de instrucciones de sistema por el admin.
+R4.3: TEXTAREA LIBRE + PLANTILLAS OPCIONALES seleccionables ("Atención al
+      cliente formal", "FAQ", "Soporte técnico", ...).
+
+Q4.4: Estrategia del router.
+R4.4: LLM CON FUNCTION CALLING. Un LLM ligero recibe la query + descripción
+      de fuentes y decide qué herramienta(s) llamar (search_docs, query_sql,
+      both).
+
+--------------------------------------------------------------------------------
+TURNO — Asistente: propuesta de estructura del documento
+--------------------------------------------------------------------------------
+Tres opciones planteadas (A: capas arquitectónicas, B: por hitos, C: por
+etapas de la memoria). Usuario eligió OPCIÓN A y añadió contexto:
+"lo que quiero es que en el html quede claro los features para de ahí sacar
+con openspec proposals, diseños, tareas etc. y que encaje todo bien".
+
+Adaptación derivada: cada capability con ID único (CAP-*), referenciable
+desde el roadmap y desde otras capabilities. Sección 7 del HTML será el
+catálogo de capabilities (la fuente para extraer proposals de OpenSpec).
+
+--------------------------------------------------------------------------------
+TURNO — Usuario: pide journey completo cohesionado
+--------------------------------------------------------------------------------
+"quisiera un proceso completo: el usuario se logea (necesitamos tener el
+servidor ejecutandose y un modulo de login conectado con google auth o la base
+de datos de usuarios interna) el usuario aterriza en el panel, puede crear un
+chatbot (modulo de creacion de chatbot, conectado a los diferentes
+proveedores, configuracion del chatbot, conexion a las distintas fuentes de
+datos, modulos que lean distintos tipos de archivos...) que cubra todos los
+puntos accesibles de la aplicacion, lo que tiene que haber desarrollado para
+el correcto funcionamiento, etc. sin perder la informacion que ya has dicho
+tu, sino cohesionandolo todo".
+
+Acción tomada: rehacer secciones 1-3 con journey de 20 pasos explícito,
+nuevo mapa de módulos ampliado, 7 flujos end-to-end (A-G).
+
+--------------------------------------------------------------------------------
+TURNO — Usuario: pide guardar logs
+--------------------------------------------------------------------------------
+"si, por cierto, me gustaria almacenar los logs de esta conversacion
+(decisiones, conversacion, sesion de claude y mensajes de usuario/claude) en
+un .log en este directorio tambien".
+
+Acción: este archivo.
+
+================================================================================
+DECISIONES TOMADAS (TABLA RESUMEN)
+================================================================================
+
+| Eje                      | Decisión                                              |
+|--------------------------|-------------------------------------------------------|
+| Tipo de documento        | Funcional detallado + roadmap M1-Mn en un HTML        |
+|                          | autocontenido con nav lateral                          |
+| Audiencia                | Usuario (visualizar) y agentes (implementar). Spec    |
+|                          | ejecutable, NO documento estético.                     |
+| Origen para OpenSpec     | Sección de catálogo de capabilities con IDs CAP-*     |
+| Tenancy                  | Multi-tenant real. 1 admin = 1 tenant en el signup    |
+|                          | (sin invitaciones de miembros en MVP).                 |
+| Auth                     | Email+password (obligatorio) + Google OAuth opcional. |
+|                          | NextAuth en frontend; backend verifica id_token y     |
+|                          | emite su propio JWT.                                   |
+| Contratos                | Firmas Python completas (ABC, tipos, errores).        |
+| Widget                   | Configurador en panel (colores/título/tamaño) con     |
+|                          | preview en vivo + snippet copiable. Bundle JS         |
+|                          | independiente (vanilla TS).                            |
+| Config pipeline          | Modo Simple (preset por tipo de contenido) y Avanzado |
+|                          | (chunking, top-k, threshold, modo router).             |
+| Upload de archivos       | Directo desde panel (drag&drop PDF/DOCX/TXT/CSV/MD)   |
+|                          | + conectores Google Drive / S3 / Dropbox.              |
+| Async ingesta            | FastAPI BackgroundTasks + tabla ingestion_jobs.       |
+|                          | Polling desde panel cada 2s mientras haya jobs.        |
+| Conversación             | Multi-turno con historial persistido (session_id).    |
+|                          | Backend stateful, no cliente.                          |
+| Repo layout              | backend/ + frontend/ + widget/ + infra/ + scripts/    |
+| System prompt            | Textarea libre + plantillas seleccionables.           |
+| Router                   | LLM con function calling.                             |
+| API keys de proveedores  | Por tenant (no por chatbot). Cifradas en BD con       |
+|                          | Fernet, clave en .env.                                 |
+| Sesión JWT               | Corta (1h). Sin revocación en BD en MVP.              |
+| Formato HTML             | Autocontenido, CSS embebido, nav lateral, Mermaid     |
+|                          | para diagramas, Prism para code highlighting.          |
+| Granularidad roadmap     | Hitos end-to-end M1-Mn demo-ables (no por semana).    |
+| Idioma de la plataforma  | Español + inglés en panel (sin i18n nativa); el LLM   |
+|                          | responde en el idioma del usuario final.              |
+| Stack (de la memoria)    | Python + FastAPI / Next.js / Qdrant / PostgreSQL /    |
+|                          | Ollama + endpoints OpenAI-compat / Docker Compose /   |
+|                          | pytest + pytest-cov / Alembic migrations.              |
+
+================================================================================
+ESTRUCTURA APROBADA DEL DOCUMENTO HTML (15 secciones)
+================================================================================
+
+ 1. Visión, glosario y supuestos
+ 2. Mapa de módulos y dependencias (Mermaid)
+ 3. Flujos end-to-end (7 diagramas de secuencia: A-G)
+ 4. Dominio: entidades + contratos Python de cada puerto
+ 5. Adaptadores MVP (implementaciones concretas de cada puerto)
+ 6. Casos de uso / servicios de aplicación
+ 7. Catálogo de capabilities (CAP-*) — fuente para OpenSpec
+ 8. API REST (endpoints, request/response)
+ 9. Modelo de datos (PostgreSQL + colecciones Qdrant; scoping multi-tenant)
+10. Panel (sitemap + wireframes textuales por pantalla)
+11. Widget embebible (anatomía, parámetros, endpoint público)
+12. Seguridad y multi-tenancy (auth, scoping, 3 capas text-to-SQL)
+13. Evaluación (RAGAS, escenarios, métricas operacionales)
+14. Roadmap M1–M7 (agrupa capabilities por hito)
+15. Riesgos y mitigaciones
+
+================================================================================
+JOURNEY DE 20 PASOS (con módulos requeridos por paso)
+================================================================================
+
+ 0. Arrancar plataforma (docker compose up; migraciones Alembic)
+ 1. Registro (email+pw o Google) → crea user + tenant + colección Qdrant
+ 2. Login → JWT → TenantScopingMiddleware
+ 3. Onboarding (primera vez) o dashboard
+ 4. Settings → Integraciones (API keys cifradas)
+ 5. Wizard paso 1: identidad (nombre, descripción, system prompt + plantillas)
+ 6. Wizard paso 2: cerebro (LLMProvider + model_id)
+ 7. Wizard paso 3: embeddings (EmbeddingProvider + model_id)
+ 8. Wizard paso 4: pipeline (Simple/Avanzado: chunking, top-k, threshold, ...)
+ 9. Wizard paso 5: fuentes (a) upload local, (b) cloud, (c) SQL read-only
+10. Wizard paso 6: widget (config visual + preview en vivo)
+11. Wizard paso 7: revisión y crear → lanza jobs de ingestión
+12. Detalle chatbot → Estado (polling jobs)
+13. Detalle chatbot → Playground (chat de prueba con citas y debug toggle)
+14. Detalle chatbot → Conversaciones (sesiones reales del widget)
+15. Detalle chatbot → Widget (snippet copiable + CORS allowed domains)
+16. Editar chatbot (cambios en embedding/chunking → reindex)
+17. Widget en web del cliente final → endpoint público /api/public/chatbots/...
+18. Borrar chatbot (cascada: Qdrant + BD)
+19. Logout
+20. Evaluación CLI (academic mode, no panel)
+
+================================================================================
+MAPA DE MÓDULOS (versión cohesionada)
+================================================================================
+
+backend/
+├── domain/
+│   ├── entities/       User, Tenant, Chatbot, KnowledgeSource, ChatSession,
+│   │                   IngestionJob, WidgetConfig, PromptTemplate,
+│   │                   ProviderCredential
+│   ├── ports/          LLMProvider, EmbeddingProvider, VectorStore,
+│   │                   DocumentLoader, CloudStorageConnector, SQLDataSource,
+│   │                   Chunker, Router, QueryGuard, OAuthVerifier,
+│   │                   SecretEncryptor
+│   ├── value_objects/  ChunkingConfig, PipelineConfig, GenerationConfig,
+│   │                   RouteDecision
+│   └── errors/
+├── adapters/
+│   ├── llm/                ollama, openai_compat
+│   ├── embeddings/         ollama_emb, openai_compat_emb
+│   ├── vector_store/       qdrant
+│   ├── document_loaders/   pdf, docx, txt, csv, markdown
+│   ├── cloud_storage/      gdrive, s3, dropbox
+│   ├── sql_sources/        postgres, mysql
+│   ├── chunkers/           fixed_size, by_structure, semantic
+│   ├── guards/             sqlglot_ast, llm_semantic
+│   ├── oauth/              google_oauth_verifier
+│   └── secrets/            fernet_encryptor
+├── application/
+│   ├── auth/               RegisterUser, LoginUser, BootstrapTenant,
+│   │                       LoginWithGoogle
+│   ├── chatbot_config/     CreateChatbot, UpdateChatbot, DeleteChatbot,
+│   │                       ListChatbots
+│   ├── sources/            AttachSource, DetachSource, ReindexSource
+│   ├── ingestion/          IngestKnowledgeSource, Reindex
+│   ├── chat/               AnswerQuery, RouteQuery, RetrieveDocs, ExecuteSQL
+│   ├── conversations/      ListSessions, GetSession
+│   ├── integrations/       UpsertProviderCredential, ListCredentials
+│   ├── widget_config/      UpdateWidgetConfig, GetPublicConfig
+│   └── evaluation/         RunRagasEvaluation
+├── infrastructure/
+│   ├── api/routers/        auth, chatbots, sources, jobs, conversations,
+│   │                       integrations, public_chat, public_widget_config
+│   ├── api/middleware/     TenantScopingMiddleware, RateLimitMiddleware,
+│   │                       CORSPerChatbotMiddleware
+│   ├── api/schemas/        Pydantic req/resp
+│   ├── persistence/        SQLAlchemy models + repos
+│   ├── jobs/               BackgroundTasksRunner + IngestionJobsRepository
+│   ├── auth/               PasswordHasher, JWTService, GoogleOAuthClient
+│   └── settings/           Pydantic Settings desde .env
+└── composition_root.py     DI: cablea adapters → ports
+
+frontend/
+├── app/
+│   ├── (auth)/             login, register, callback Google
+│   ├── onboarding/
+│   ├── chatbots/
+│   │   ├── page.tsx        listado
+│   │   ├── create/         wizard 7 pasos
+│   │   └── [id]/           status, playground, conversations, widget,
+│   │                       settings/*
+│   ├── sources/            gestión a nivel tenant (opcional MVP)
+│   └── settings/           integrations, account
+├── lib/api/                cliente generado de OpenAPI
+├── components/
+└── widget-preview/         renderiza el widget real con props para preview
+
+widget/
+├── src/                    vanilla TS
+├── dist/widget.js          bundle servido como estático por backend
+└── README.md
+
+infra/
+├── docker-compose.yml
+├── migrations/             Alembic
+└── seed/
+
+scripts/
+├── evaluate.py
+└── load_dataset.py
+
+datasets/                   3 escenarios para evaluación
+
+================================================================================
+FLUJOS END-TO-END (resumen)
+================================================================================
+
+A. Ingesta de archivos locales:
+   upload multipart → persistir → crear ingestion_job → BackgroundTasks →
+   DocumentLoader por ext → Chunker → EmbeddingProvider → VectorStore
+   (colección tenant_{id}) → job status=ready.
+
+B. Chat documental:
+   widget POST /api/public/chatbots/{id}/chat → AnswerQuery → Router decide
+   search_docs → VectorStore.search(top_k, filter tenant) → build prompt
+   (system + chunks + last N turns + query) → LLMProvider.generate → persist
+   turn → respond.
+
+C. Chat con routing docs+SQL:
+   AnswerQuery → Router elige query_sql (o both) → Text2SQL: LLM genera SQL →
+   QueryGuard valida (3 capas: privilegio mínimo en conexión, AST sqlglot,
+   juez semántico LLM ligero) → ejecuta read-only → resultados → concatena al
+   prompt si router pidió ambos → generate → respond.
+
+D. Login/registro:
+   - email+pw: RegisterUser → BootstrapTenant → JWT.
+   - Google: NextAuth obtiene id_token → POST /api/auth/google → backend
+     verifica con GoogleOAuthVerifier → busca user por email; si no existe,
+     RegisterUser + BootstrapTenant → JWT.
+
+E. Crear chatbot (wizard 7 pasos):
+   draft row con status=draft, PATCH por paso. Paso 5 valida fuentes (test
+   connection SQL, list folders cloud, registra archivos upload). Paso 7
+   activa chatbot + lanza IngestKnowledgeSource para cada fuente.
+
+F. Ingesta cloud:
+   CloudStorageConnector lista carpeta → descarga → DocumentLoader → resto
+   igual que A. Re-sync manual desde panel (sin watcher en MVP).
+
+G. Ingesta SQL (introspección, no indexa filas):
+   Conecta como read-only → schema_snapshot (tablas, columnas, tipos,
+   descripciones del admin) → persiste como contexto para text-to-SQL.
+
+================================================================================
+PRÓXIMOS PASOS EN LA SESIÓN
+================================================================================
+
+Pendientes de presentar y aprobar al usuario antes de escribir el HTML:
+
+[ ] Sección 4 — Entidades de dominio + contratos Python de cada puerto
+[ ] Sección 5 — Adaptadores MVP (qué trae el MVP de cada puerto)
+[ ] Sección 6 — Casos de uso (lista canónica con responsabilidades)
+[ ] Sección 7 — Catálogo de capabilities CAP-* (la sección para OpenSpec)
+[ ] Sección 8 — API REST (endpoints, req/resp)
+[ ] Sección 9 — Modelo de datos (Postgres + Qdrant)
+[ ] Sección 10 — Panel (sitemap + wireframes textuales)
+[ ] Sección 11 — Widget (anatomía, parámetros)
+[ ] Sección 12 — Seguridad y multi-tenancy
+[ ] Sección 13 — Evaluación
+[ ] Sección 14 — Roadmap M1–M7
+[ ] Sección 15 — Riesgos
+[ ] Escribir HTML final en docs/superpowers/specs/
+[ ] Revisión del usuario sobre el HTML
+
+================================================================================
+PREGUNTAS ABIERTAS O DECISIONES DIFERIDAS (a confirmar más adelante)
+================================================================================
+
+- Catálogo cerrado de modelos LLM/embeddings ofrecidos en el MVP: pendiente
+  de listar concretamente (probablemente: Ollama llama3.1, mistral, gemma2;
+  OpenAI gpt-4o-mini, gpt-4o; Groq llama-3.1-70b; embeddings: bge-m3,
+  embeddinggemma, text-embedding-3-small).
+- Política de retención de conversaciones del widget: ¿se borran tras X días?
+  ¿el admin puede configurarlo? (Por defecto: retención indefinida hasta que
+  el admin las borre).
+- Rate limiting del endpoint público del widget: por IP / por session_id /
+  por dominio referrer. (Por defecto: por IP, 60 req/min.)
+- Si la conexión SQL del admin tarda en pingar (timeout), ¿qué se le muestra?
+- Si una API key cifrada se corrompe (cambio de FERNET_KEY entre deploys),
+  ¿qué pasa? (Por defecto: la integración queda "rota", el admin re-pega la
+  key.)
+- Soporte de modelos locales con cuantización: ¿el panel deja elegir, o se
+  delega a configuración de Ollama externa?
+- Sesión JWT corta (1h) sin refresh tokens: usuario tendrá que volver a
+  loguearse. ¿Aceptable o añadimos refresh? (Por defecto: aceptable en MVP.)
+
+================================================================================
+SECCIÓN 4 — DOMINIO (presentada, ajustes en curso)
+================================================================================
+
+Entidades presentadas: User, Tenant, Chatbot, KnowledgeSource, IngestionJob,
+ChatSession, ChatMessage, WidgetConfig, PromptTemplate, ProviderCredential.
+
+Value objects: ChunkingConfig, PipelineConfig, GenerationConfig, RouteDecision,
+Chunk, RetrievedChunk, Citation, LLMSelection, EmbeddingSelection.
+
+Puertos (todos abstractos, async donde hay I/O):
+- LLMProvider (generate, stream, list_models, tool_calling)
+- EmbeddingProvider (embed_text, embed_batch, dimension)
+- VectorStore (ensure_collection, upsert, search, delete_by_source,
+  delete_collection) — search exige tenant_id+chatbot_id en filtro
+- DocumentLoader (load) — un loader por extensión
+- CloudStorageConnector (list_folder, download, test_credential)
+- SQLDataSource (test_connection, introspect_schema, execute_readonly)
+- Chunker (chunk) — sync, CPU-bound
+- Router (route) — usa LLM con function calling
+- QueryGuard (validate) — 3 capas: privilegio + AST sqlglot + juez semántico
+- OAuthVerifier (verify_token) — Google en MVP
+- SecretEncryptor (encrypt/decrypt) — Fernet
+
+Jerarquía de errores de dominio: DomainError raíz, subclases por área.
+
+DECISIONES NUEVAS / CORRECCIONES DE LA SECCIÓN 4:
+
+[CORRECCIÓN + REFINAMIENTO] Modelo de proveedores rehecho tras feedback del
+usuario en dos rondas:
+
+Ronda 1: separar tipo / credencial / selección.
+Ronda 2: nomenclatura final + decisión explícita "no hay superadmin en MVP,
+el catálogo de proveedores vive en código".
+
+Ahora: tres niveles separados:
+
+  1. `LLMProviderDescriptor` + `LLM_PROVIDER_CATALOG` (server-side, código).
+     Archivo: `domain/catalog/llm_providers.py`. El catálogo es un dict
+     `{provider_id: (Descriptor, adapter_class)}`. El Descriptor contiene
+     id, display_name, description, config_source (SERVER_ENV |
+     TENANT_CREDENTIAL), requires_base_url_input, supports_tool_calling,
+     default_models. MVP registra 'ollama', 'openai', 'openai_compat'
+     (genérico para Groq, Together, GitHub Models, NIM, OpenRouter,
+     DeepSeek y cualquier endpoint Chat Completions). Análogo para
+     embeddings (EMBEDDING_PROVIDER_CATALOG).
+
+     Decisión explícita: NO HAY SUPERADMIN en MVP. Añadir un nuevo
+     proveedor (p.ej. Anthropic nativo) = escribir adaptador + añadir
+     entrada al catálogo + redeploy. No es config de runtime.
+     El sysadmin sólo toca .env para globals (OLLAMA_BASE_URL, JWT_SECRET,
+     FERNET_KEY).
+
+     Nomenclatura final acordada para clases:
+       - Puerto/ABC: `LLMProvider`
+       - Adaptadores concretos: `OllamaLLMAdapter`, `OpenAILLMAdapter`,
+         `OpenAICompatLLMAdapter`. Sufijo `Adapter` para diferenciar del
+         puerto.
+       - Catálogo: `LLMProviderDescriptor` + `LLM_PROVIDER_CATALOG` dict.
+
+  2. `ProviderCredential` (BD, por tenant). Una instancia configurada con
+     api_key cifrada y, si aplica, base_url. El tenant puede tener varias
+     del mismo tipo (varios endpoints OpenAI-compat con keys distintas).
+     Sólo se crea para proveedores con config_source=TENANT_CREDENTIAL.
+     Ollama, al ser SERVER_ENV, no tiene credentials por tenant.
+
+  3. `LLMSelection` (value object dentro del Chatbot). { provider_id,
+     credential_id (None si el descriptor no requiere), model_id }.
+     Idem `EmbeddingSelection`. Opcionalmente `router_llm: LLMSelection | None`
+     para usar un modelo distinto como router.
+
+  El `composition_root.resolve_llm(selection, tenant_id)` resuelve la cadena
+  en runtime:
+    - Lee descriptor + adapter_class del catálogo.
+    - Si config_source=SERVER_ENV: instancia adapter con base_url del .env.
+    - Si config_source=TENANT_CREDENTIAL: carga ProviderCredential del
+      tenant, descifra api_key, instancia adapter con (api_key) o
+      (base_url, api_key) según requires_base_url_input.
+  Los casos de uso reciben un LLMProvider ya resuelto, NO conocen el
+  catálogo ni las credentials.
+
+[CLARIFICACIÓN] Tenant en el MVP es 1:1 con User pero NO se elimina del
+modelo:
+  - Aislamiento real de datos (filtros por tenant_id en BD).
+  - Colección Qdrant física por tenant (`tenant_{uuid}`), no filtro.
+  - Storage de archivos en `storage/tenant_{uuid}/`.
+  - Permite evolución a "cuenta de equipo" sin refactor.
+  - Invisible en UI: para el admin es "mi cuenta / mi espacio".
+
+[NOTA] `Chatbot.router_llm` opcional: si None, el router usa el mismo LLM
+que responde; si se rellena, permite usar modelo más barato/rápido como
+router.
+
+[NOTA] Vector store NO entra en el patrón de registry en MVP: siempre Qdrant.
+Si en futuro se ofrece elección, se haría a nivel Tenant, no Chatbot.
+
+RESOLUCIONES DE LOS PUNTOS ABIERTOS DE LA SECCIÓN 4:
+
+- `Chatbot.llm` ahora es objeto compuesto `LLMSelection { provider_id,
+  credential_id, model_id }`. Idem `EmbeddingSelection` y `router_llm`
+  opcional. RESUELTO.
+
+- `ChatMessage.tokens_in / tokens_out / latency_ms`: SE MANTIENEN. Alimenta
+  las métricas operacionales del TFM (sección 4.4.5) y el logging general.
+
+- Texto de los chunks: vive SÓLO en payload de Qdrant (opción C). No se
+  duplica en Postgres. Razones documentadas: el texto es ~12% del coste
+  del vector, ahorrarlo costaría re-parsear el documento en cada query
+  (250 ms – 1.5 s extra), los offsets de PDF/DOCX no son estables entre
+  versiones de parser, y las citas en UI requieren el texto.
+
+- `Citation` value object REVISADO: en el log persistido (ChatMessage.citations
+  en Postgres) NO se guarda el texto del chunk, sólo la referencia:
+    {source_id, source_name, location, chunk_id, score}.
+  El texto literal del fragmento citado se resuelve bajo demanda contra
+  Qdrant usando `chunk_id` (p.ej. cuando la UI de "Conversaciones" lo pide).
+  Decisión motivada por trazabilidad: en Postgres el chat log debe decir
+  DE DÓNDE salió la respuesta, no QUÉ literal salió. Si se re-indexa el
+  chatbot, los chunk_id antiguos pueden no resolver el texto, pero la
+  referencia al documento + page sigue intacta. Aceptable para MVP.
+
+ESTADO DE LA SECCIÓN 4: CERRADA Y APROBADA. Lista para alimentar Sección 5
+(adaptadores MVP).
+
+================================================================================
+SECCIÓN 5 — ADAPTADORES MVP (presentada, pendiente de aprobación)
+================================================================================
+
+Sección presentada con 13 sub-bloques (5.1 a 5.13). Resumen del catálogo MVP:
+
+5.1 LLMProvider:
+    - OllamaLLMAdapter           (httpx, base_url del .env)
+    - OpenAILLMAdapter           (openai SDK, api_key del tenant)
+    - OpenAICompatLLMAdapter     (openai SDK, base_url + api_key del tenant)
+    Cobertura: Ollama local, OpenAI oficial, y cualquier endpoint
+    Chat-Completions-compatible (Groq, Together, GitHub Models, NIM,
+    DeepSeek, OpenRouter, etc.) sin código nuevo.
+
+5.2 EmbeddingProvider:
+    - OllamaEmbeddingAdapter
+    - OpenAICompatEmbeddingAdapter (también cubre OpenAI oficial)
+    Modelos por defecto: bge-m3, nomic-embed-text, embeddinggemma:300m (Ollama);
+    text-embedding-3-small / -3-large (OpenAI).
+    dimension(model_id) hardcoded en tabla del adapter para validar antes
+    de la primera ingestión.
+
+5.3 VectorStore:
+    - QdrantVectorStore (qdrant-client async)
+    Aislamiento multi-tenant doble: colección física por tenant
+    (`tenant_{uuid}`) + filtro por tenant_id en payload.
+    search() exige tenant_id+chatbot_id en filter; sin ellos,
+    TenantScopeViolation se levanta en el use case.
+
+5.4 DocumentLoader (uno por extensión):
+    - PDFDocumentLoader       (pymupdf)
+    - DOCXDocumentLoader      (python-docx)
+    - TXTDocumentLoader       (stdlib)
+    - CSVDocumentLoader       (csv stdlib, fila → párrafo linealizado)
+    - MarkdownDocumentLoader  (markdown-it-py, preserva headings)
+    DOCUMENT_LOADERS dict por extensión. Loader desconocido → archivo
+    marcado failed pero el job sigue con el resto.
+
+5.5 CloudStorageConnector:
+    - GoogleDriveConnector  (google-api-python-client, OAuth)
+    - S3Connector           (aioboto3, access+secret keys)
+    - DropboxConnector      (dropbox SDK, OAuth)
+    Cada uno con descriptor en CLOUD_STORAGE_CATALOG.
+
+5.6 SQLDataSource:
+    - PostgresSQLDataSource  (SQLAlchemy Core + asyncpg)
+    - MySQLSQLDataSource     (SQLAlchemy Core + aiomysql)
+    Capas defensivas en execute_readonly: `SET TRANSACTION READ ONLY`
+    + `statement_timeout`. La validación AST es responsabilidad del
+    QueryGuard, no del DataSource.
+
+5.7 Chunker:
+    - FixedSizeChunker       (FIXED_SIZE)
+    - StructureChunker       (BY_STRUCTURE, usa metadata del loader)
+    - SemanticChunker        (SEMANTIC, embedding-based, opcional)
+    SemanticChunker es caro: en MVP el preset Simple usa fixed o
+    structure según content_hint.
+
+5.8 Router:
+    - LLMFunctionCallingRouter
+    Único adapter. Si router_mode != AUTO, el use case fuerza la tool y
+    no invoca al router.
+
+5.9 QueryGuard:
+    - LayeredQueryGuard
+    Tres capas en orden:
+      1) AST sqlglot: debe ser SELECT puro, sin múltiples sentencias, sin
+         DDL/DML anidados (Insert/Update/Delete/Drop/Alter/Create/Command).
+      2) Juez semántico LLM (opcional, sólo si judge_llm != None): prompt
+         corto pidiendo JSON {allow, reason}.
+      3) Privilegio mínimo: garantizado por la conexión read-only del
+         usuario SQL configurado por el admin. Capa "blanda" del guard.
+
+5.10 OAuthVerifier:
+    - GoogleOAuthVerifier  (google-auth, valida firma + aud + iss + exp)
+
+5.11 SecretEncryptor:
+    - FernetSecretEncryptor  (cryptography.fernet, clave del .env)
+    InvalidToken → SecretDecryptError (rotación de clave o corrupción).
+
+5.13 Dependencias backend pinned (lista completa en el documento):
+    fastapi, uvicorn, pydantic, pydantic-settings, sqlalchemy[asyncio],
+    alembic, asyncpg, aiomysql, qdrant-client, openai, httpx, pymupdf,
+    python-docx, markdown-it-py, sqlglot, cryptography, google-auth,
+    google-api-python-client, aioboto3, dropbox, ragas, datasets,
+    pytest, pytest-asyncio, pytest-cov, ruff, mypy.
+
+ESTADO DE LA SECCIÓN 5: PRESENTADA, PENDIENTE DE APROBACIÓN.
+
+PREGUNTAS ABIERTAS DE SECCIÓN 5 (a responder en siguiente sesión):
+
+Q5.1 — Extensiones de archivo a soportar en MVP.
+       Actual: PDF, DOCX, TXT, CSV, MD.
+       ¿Añadir XLSX / JSON / HTML, o cerrar el set en 5?
+       Recomendación: cerrar en 5 para MVP académico; XLSX y HTML como
+       línea futura.
+
+Q5.2 — Conectores cloud en MVP.
+       Actual: Google Drive + S3 + Dropbox.
+       ¿Los tres, o reducir a 1-2 para no inflar alcance?
+       Recomendación: dejar 2 (Google Drive + S3) en MVP. Dropbox como
+       extensión. Cada conector se evalúa por separado y vale ~1 día
+       de implementación cada uno.
+
+Q5.3 — Engines SQL.
+       Actual: Postgres + MySQL.
+       ¿Ambos, o sólo Postgres (que ya usa la propia plataforma)?
+       Recomendación: ambos, porque demuestra mejor la modularidad del
+       puerto SQLDataSource y MySQL es trivial añadirlo sobre
+       SQLAlchemy Core.
+
+================================================================================
+PUNTO DE CORTE DE LA SESIÓN (2026-05-19)
+================================================================================
+
+Usuario tiene que cortar. Estado consolidado:
+  - Secciones 1, 2, 3 (visión + mapa + flujos) APROBADAS.
+  - Sección 4 (dominio + contratos) APROBADA Y CERRADA.
+  - Sección 5 (adaptadores MVP) PRESENTADA, pendiente las 3 preguntas
+    Q5.1/Q5.2/Q5.3 para aprobar.
+  - Secciones 6 a 15: pendientes de presentar.
+
+Próxima sesión: arrancar leyendo `handover.md` en la raíz del repo.
+El HTML final no se escribirá hasta que TODAS las secciones (1-15) estén
+aprobadas. El terminal state de la skill brainstorming es invocar
+writing-plans para generar el plan de implementación a partir del spec.
+
+================================================================================
+FIN DEL LOG (se actualizará al cerrar cada sección aprobada)
+================================================================================

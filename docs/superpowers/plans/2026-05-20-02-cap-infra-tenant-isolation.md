@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add the User + Tenant ORM models, the tenant-scoped repository CRUD layer, the JWT-based tenant scoping middleware, and the `TenantScopeViolation` invariant. After this plan, repositories filter by `tenant_id` automatically and the system rejects cross-tenant access.
+**Goal:** Add the User + Tenant ORM models, the tenant-scoped repository CRUD layer, the JWT-based tenant scoping middleware, and the `TenantScopeViolationError` invariant. After this plan, repositories filter by `tenant_id` automatically and the system rejects cross-tenant access.
 
 **Architecture:** Tenant isolation is enforced at three layers in defense-in-depth: (1) HTTP middleware extracts `tenant_id` from the JWT and pins it into a `RequestContext`; (2) every repository receives that context and filters all queries by `tenant_id`; (3) ORM models carry a `tenant_id` column with a NOT NULL constraint. Qdrant collections are physically separated per `(tenant, dim)` (already implemented in plan #1 via `collection_name_for`).
 
@@ -24,7 +24,7 @@ backend/src/tfm_rag/
 │   │   ├── tenant.py             # Tenant entity (domain)
 │   │   └── user.py               # User entity (domain)
 │   └── errors/
-│       └── common.py             # add TenantScopeViolation
+│       └── common.py             # add TenantScopeViolationError
 ├── infrastructure/
 │   ├── auth/
 │   │   ├── __init__.py
@@ -61,7 +61,7 @@ backend/tests/integration/
 - `infrastructure/api/middleware/tenant_scoping.py`: ASGI middleware that pulls `Authorization: Bearer <jwt>`, decodes, attaches `RequestContext(tenant_id, user_id)` to `request.state`.
 - `infrastructure/api/dependencies.py`: FastAPI deps for session and context.
 - `alembic/versions/0002_users_tenants.py`: creates `tenants` and `users` tables per spec §9.
-- `domain/errors/common.py`: add `TenantScopeViolation`.
+- `domain/errors/common.py`: add `TenantScopeViolationError`.
 
 ---
 
@@ -121,7 +121,7 @@ git commit -m "feat(domain): User and Tenant entities"
 
 ---
 
-## Task 2 — Add `TenantScopeViolation` error
+## Task 2 — Add `TenantScopeViolationError` error
 
 **Files:**
 - Create: `backend/src/tfm_rag/domain/errors/common.py`
@@ -141,7 +141,7 @@ class ValidationError(DomainError):
     """Raised when input validation fails at the domain level."""
 
 
-class TenantScopeViolation(DomainError):
+class TenantScopeViolationError(DomainError):
     """Raised when a use case tries to access data from a different tenant.
 
     This should NEVER happen in correctly-written code; if it triggers,
@@ -153,7 +153,7 @@ class TenantScopeViolation(DomainError):
 
 ```bash
 git add backend/src/tfm_rag/domain/errors/common.py
-git commit -m "feat(domain): base errors + TenantScopeViolation"
+git commit -m "feat(domain): base errors + TenantScopeViolationError"
 ```
 
 ---
@@ -369,7 +369,7 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tfm_rag.domain.errors.common import NotFoundError, TenantScopeViolation
+from tfm_rag.domain.errors.common import NotFoundError, TenantScopeViolationError
 from tfm_rag.infrastructure.persistence.base import Base
 
 
@@ -397,11 +397,11 @@ class BaseRepository[E: Base]:
     def _check_tenant(self, row: object) -> None:
         row_tenant = getattr(row, "tenant_id", None)
         if row_tenant is None:
-            raise TenantScopeViolation(
+            raise TenantScopeViolationError(
                 f"{type(row).__name__} has no tenant_id; refusing to operate."
             )
         if row_tenant != self._ctx.tenant_id:
-            raise TenantScopeViolation(
+            raise TenantScopeViolationError(
                 f"Row tenant {row_tenant!s} != context tenant {self._ctx.tenant_id!s}."
             )
 
@@ -908,7 +908,7 @@ from uuid import uuid4
 
 import pytest
 
-from tfm_rag.domain.errors.common import NotFoundError, TenantScopeViolation
+from tfm_rag.domain.errors.common import NotFoundError, TenantScopeViolationError
 from tfm_rag.infrastructure.persistence.engine import (
     build_engine,
     build_session_factory,
@@ -962,11 +962,11 @@ async def test_tenant_a_cannot_see_tenant_b(settings: Settings) -> None:
         with pytest.raises(NotFoundError):
             await repo_b_read.get(tenant_a_id)
 
-    # Tenant B tries to add a row with tenant_id of A → TenantScopeViolation
+    # Tenant B tries to add a row with tenant_id of A → TenantScopeViolationError
     async with factory() as session:
         repo_b_add = TenantRepository(session, ctx_b)
         bad_row = _tenant(tenant_a_id)
-        with pytest.raises(TenantScopeViolation):
+        with pytest.raises(TenantScopeViolationError):
             await repo_b_add.add(bad_row)
 
     await engine.dispose()
@@ -1019,7 +1019,7 @@ git tag cap-02-infra-tenant-isolation
 ## Done criteria for CAP-INFRA-TENANT-ISOLATION
 
 - Migration 0002 creates `tenants` and `users` tables per spec §9.
-- `BaseRepository[E]` filters every query by `ctx.tenant_id` and refuses cross-tenant writes via `TenantScopeViolation`.
+- `BaseRepository[E]` filters every query by `ctx.tenant_id` and refuses cross-tenant writes via `TenantScopeViolationError`.
 - JWT encode/decode helpers are implemented and tested.
 - `TenantScopingMiddleware` extracts `tenant_id`/`user_id` from JWT, attaches `RequestContext` to `request.state.ctx`, returns 401 for missing/invalid tokens, lets unauthenticated paths through.
 - `app.py` registers the middleware.

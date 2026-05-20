@@ -623,7 +623,7 @@ class SecretEncryptor(ABC):
 class DomainError(Exception): ...
 class NotFoundError(DomainError): ...
 class ValidationError(DomainError): ...
-class TenantScopeViolation(DomainError): ...
+class TenantScopeViolationError(DomainError): ...
 
 # domain/errors/knowledge.py  (NUEVO en §6)
 class KnowledgeBaseNotFoundError(NotFoundError): ...
@@ -874,7 +874,7 @@ pytest, pytest-asyncio, pytest-cov, ruff, mypy</pre>
 <h4>Aislamiento multi-tenant</h4>
 <dl>
 <dt>Ámbito</dt><dd>Garantiza que ninguna operación pueda leer/escribir datos fuera del tenant del usuario autenticado.</dd>
-<dt>Descripción</dt><dd><code>TenantScopingMiddleware</code> extrae <code>tenant_id</code> del JWT y lo inyecta en el request context. Todos los repositorios filtran por <code>tenant_id</code>; las colecciones Qdrant son físicamente distintas por tenant; los prefijos de storage incluyen <code>tenant_id</code>. Cualquier use case que cruce fronteras levanta <code>TenantScopeViolation</code>.</dd>
+<dt>Descripción</dt><dd><code>TenantScopingMiddleware</code> extrae <code>tenant_id</code> del JWT y lo inyecta en el request context. Todos los repositorios filtran por <code>tenant_id</code>; las colecciones Qdrant son físicamente distintas por tenant; los prefijos de storage incluyen <code>tenant_id</code>. Cualquier use case que cruce fronteras levanta <code>TenantScopeViolationError</code>.</dd>
 <dt>Deps</dt><dd><code>CAP-INFRA-PERSISTENCE</code></dd>
 <dt>Use cases</dt><dd>— (transversal)</dd>
 <dt>Non-goals</dt><dd>No implementa invitaciones de miembros. No implementa roles/permisos finos dentro de un tenant.</dd>
@@ -1079,7 +1079,7 @@ pytest, pytest-asyncio, pytest-cov, ruff, mypy</pre>
   <li>Content-Type: <code>application/json</code> (uploads: <code>multipart/form-data</code>).</li>
   <li>Paginación: <code>?page=N&amp;page_size=M</code> (default 20, max 100); respuesta <code>{items, page, page_size, total}</code>.</li>
   <li>IDs: UUIDv7.</li>
-  <li>Errores: <code>{error: {code, message, details?}}</code> + status HTTP. Códigos: 400 Validation, 401 Unauthenticated, 403 TenantScopeViolation, 404 NotFound, 409 Conflict (incl. <code>KnowledgeBaseInUse</code>, <code>IncompatibleEmbeddings</code>), 422 Semantic, 429 RateLimited, 500 Internal.</li>
+  <li>Errores: <code>{error: {code, message, details?}}</code> + status HTTP. Códigos: 400 Validation, 401 Unauthenticated, 403 TenantScopeViolationError, 404 NotFound, 409 Conflict (incl. <code>KnowledgeBaseInUse</code>, <code>IncompatibleEmbeddings</code>), 422 Semantic, 429 RateLimited, 500 Internal.</li>
   <li>Timestamps: ISO-8601 UTC.</li>
 </ul>
 
@@ -1472,7 +1472,7 @@ Endpoint público (no parte del panel):
 <ul>
   <li><code>TenantScopingMiddleware</code> extrae <code>tenant_id</code> del JWT y lo inyecta en <code>RequestContext</code>.</li>
   <li>TODOS los repositorios reciben <code>ctx</code> y filtran por <code>ctx.tenant_id</code>; nunca aceptan <code>tenant_id</code> del request body.</li>
-  <li>Cualquier intento de acceso a recurso con tenant distinto → <code>TenantScopeViolation</code> (403).</li>
+  <li>Cualquier intento de acceso a recurso con tenant distinto → <code>TenantScopeViolationError</code> (403).</li>
   <li><strong>Tests de mutación obligatorios</strong> por endpoint que intentan tenant_B leyendo datos de tenant_A.</li>
   <li>Qdrant: colección física por <code>(tenant, dim)</code> (no solo filtro lógico). Filtros adicionales por <code>kb_id</code> y <code>tenant_id</code> en payload.</li>
   <li>Storage: prefix <code>tenant_&lt;id&gt;/...</code> por convención + ACL si se usa S3.</li>

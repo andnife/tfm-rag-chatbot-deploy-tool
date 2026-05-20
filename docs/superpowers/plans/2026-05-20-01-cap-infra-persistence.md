@@ -1460,7 +1460,7 @@ git tag cap-01-infra-persistence
 - `users` and `tenants` ORM models + migration 0002.
 - `TenantScopingMiddleware` that extracts `tenant_id` from a (yet to be added) JWT and populates the `RequestContext`.
 - Tenant-aware methods on `BaseRepository` (`add`, `get`, `list`, `delete`).
-- `TenantScopeViolation` error in `domain/errors/common.py`.
+- `TenantScopeViolationError` error in `domain/errors/common.py`.
 - Test of mutation: tenant_B endpoint cannot read tenant_A data.
 
 Plan #2 will be written after this one is merged.

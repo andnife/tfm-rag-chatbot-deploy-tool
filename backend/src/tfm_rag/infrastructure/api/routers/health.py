@@ -12,7 +12,6 @@ from tfm_rag.infrastructure.persistence.engine import (
 from tfm_rag.infrastructure.settings import Settings, get_settings
 from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore
 
-
 router = APIRouter(tags=["health"])
 
 
@@ -28,7 +27,7 @@ class HealthResponse(BaseModel):
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health(settings: Settings = Depends(get_settings)) -> HealthResponse:
+async def health(settings: Settings = Depends(get_settings)) -> HealthResponse:  # noqa: B008
     components: list[ComponentHealth] = []
 
     # Postgres

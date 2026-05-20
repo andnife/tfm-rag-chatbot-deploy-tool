@@ -16,6 +16,7 @@ dependencies = [
     "httpx>=0.28",
     "structlog>=24.4",
     "bcrypt>=4.2",
+    "google-auth>=2.35",
 ]
 
 [project.optional-dependencies]

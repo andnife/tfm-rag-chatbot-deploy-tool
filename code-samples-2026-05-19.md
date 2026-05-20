@@ -4,9 +4,34 @@ Snippets Python literales generados durante la sesión. Acompañan al
 `conversation-2026-05-19.log` (decisiones y rationale) y al `handover.md`
 (estado y continuación). Aquí está SOLO el código, sin prosa.
 
-Estado al cierre de sesión: secciones 4 (dominio) y 5 (adaptadores)
+> ⚠️ **AVISO — Este archivo es un snapshot de la sesión 1 (2026-05-19).**
+> En la sesión 2 (cierre de §6) se introdujeron cambios estructurales
+> que dejan parcialmente desactualizado este código. **No regenerar
+> implementaciones desde aquí sin contrastar con el log y el handover.**
+>
+> Cambios clave que afectan a lo que aparece más abajo:
+> - `KnowledgeSource` se sustituye por `KnowledgeBase` (contenedor a
+>   nivel tenant) + `Source` polimórfico (`DocumentSource`,
+>   `DatabaseSource`).
+> - El `Chatbot` deja de "owns sources"; ahora referencia KBs en una
+>   relación N:M (`chatbot_knowledge_base`).
+> - `chunking_config` y `embedding_selection` migran del `Chatbot` a la
+>   `KnowledgeBase` (config de indexación vive con la KB).
+> - `PipelineConfig` se amplía con: `max_retrieval_iterations`,
+>   `agentic_mode`, `enable_reranker`, `reranker_initial_top_k`,
+>   `abstain_when_insufficient`, `router_llm_selection`.
+> - Nuevo puerto `Reranker` (no presente en §5 abajo).
+> - Nuevo VO `RetrievalIteration` (telemetría por iteración del loop
+>   agéntico).
+> - `Router` mantiene la firma pero su menú de tools se amplía a
+>   `search_docs`, `query_database`, `final_answer`, `abstain`.
+>
+> El log (sección "SECCIÓN 6 — CASOS DE USO / SERVICIOS DE APLICACIÓN")
+> tiene el modelo final de dominio canónico.
+
+Estado al cierre de sesión 1: secciones 4 (dominio) y 5 (adaptadores)
 presentadas. Sección 4 aprobada y cerrada. Sección 5 pendiente de las
-preguntas Q5.1/Q5.2/Q5.3.
+preguntas Q5.1/Q5.2/Q5.3 (resueltas en sesión 2; ver log).
 
 Todo el código asume Python 3.11+. Las entidades de dominio son
 inmutables (`frozen=True`).

@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TFM RAG Chatbot Platform — Diseño funcional + roadmap</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --panel: #fff;
+    --text: #1c1917;
+    --muted: #57534e;
+    --rule: #e7e5e4;
+    --accent: #1d4ed8;
+    --accent-soft: #dbeafe;
+    --code-bg: #f5f5f4;
+    --warn-bg: #fef3c7;
+    --warn-border: #f59e0b;
+    --ok-bg: #dcfce7;
+    --ok-border: #16a34a;
+    --neutral-bg: #f1f5f9;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px; line-height: 1.55; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: var(--mono); font-size: 13px; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px;
+    border: 1px solid var(--rule); overflow-x: auto; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule);
+    vertical-align: top; }
+  th { background: var(--neutral-bg); font-weight: 600; }
+  tr:hover td { background: #fafafa; }
+  ul, ol { margin: 8px 0 8px 22px; padding: 0; }
+  li { margin: 3px 0; }
+  blockquote { border-left: 3px solid var(--accent); padding: 4px 14px;
+    margin: 12px 0; background: var(--accent-soft); border-radius: 0 6px 6px 0; }
+  .layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+  nav.toc {
+    background: var(--panel); border-right: 1px solid var(--rule);
+    padding: 24px 18px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  nav.toc h1 { font-size: 14px; margin: 0 0 8px 0; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em; }
+  nav.toc .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; }
+  nav.toc ol li { font-size: 13.5px; margin: 1px 0; }
+  nav.toc ol li a { display: block; color: var(--text); padding: 4px 8px;
+    border-radius: 4px; }
+  nav.toc ol li a:hover { background: var(--accent-soft); text-decoration: none; }
+  nav.toc .num { color: var(--muted); display: inline-block; min-width: 22px; }
+  main { padding: 36px 48px 96px 48px; max-width: 1080px; }
+  header.doc { border-bottom: 1px solid var(--rule); padding-bottom: 18px;
+    margin-bottom: 24px; }
+  header.doc h1 { font-size: 28px; margin: 0 0 6px 0; }
+  header.doc .meta { color: var(--muted); font-size: 13px; }
+  section { margin-bottom: 52px; }
+  section > h2 { font-size: 22px; margin: 0 0 10px 0; padding-bottom: 6px;
+    border-bottom: 2px solid var(--accent); }
+  section > h2 .num { color: var(--accent); margin-right: 8px; }
+  h3 { font-size: 17px; margin: 22px 0 8px 0; }
+  h4 { font-size: 15px; margin: 16px 0 6px 0; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+    background: var(--accent-soft); color: var(--accent); }
+  .badge.ok { background: var(--ok-bg); color: #14532d; }
+  .badge.warn { background: var(--warn-bg); color: #78350f; }
+  .badge.neutral { background: var(--neutral-bg); color: var(--muted); }
+  .rectify { background: var(--ok-bg); border: 1px solid var(--ok-border);
+    border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13.5px; }
+  .rectify::before { content: "✓ Rectificación aplicada — "; font-weight: 600;
+    color: #14532d; }
+  .note { background: var(--warn-bg); border: 1px solid var(--warn-border);
+    border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13.5px; }
+  .cap-card { border: 1px solid var(--rule); border-radius: 6px;
+    padding: 14px 16px; margin: 12px 0; background: var(--panel); }
+  .cap-card h4 { margin: 0 0 6px 0; color: var(--text);
+    text-transform: none; letter-spacing: 0; font-size: 15px; }
+  .cap-card .cap-id { font-family: var(--mono); color: var(--accent);
+    font-size: 13px; font-weight: 600; }
+  .cap-card dl { margin: 8px 0; display: grid;
+    grid-template-columns: 130px 1fr; gap: 4px 12px; font-size: 13.5px; }
+  .cap-card dt { color: var(--muted); font-weight: 600; }
+  .cap-card dd { margin: 0; }
+  .toc-mini { font-size: 13px; color: var(--muted); margin: 12px 0; }
+  .toc-mini a { color: var(--muted); }
+  @media (max-width: 920px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { position: static; height: auto; border-right: none;
+      border-bottom: 1px solid var(--rule); }
+    main { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc">
+  <h1>TFM RAG Platform</h1>
+  <div class="subtitle">Diseño funcional + roadmap<br>2026-05-19 → 2026-05-20</div>
+  <ol>
+    <li><a href="#s1"><span class="num">1</span>Visión, glosario y supuestos</a></li>
+    <li><a href="#s2"><span class="num">2</span>Mapa de módulos</a></li>
+    <li><a href="#s3"><span class="num">3</span>Flujos end-to-end</a></li>
+    <li><a href="#s4"><span class="num">4</span>Dominio y contratos</a></li>
+    <li><a href="#s5"><span class="num">5</span>Adaptadores MVP</a></li>
+    <li><a href="#s6"><span class="num">6</span>Casos de uso</a></li>
+    <li><a href="#s7"><span class="num">7</span>Catálogo de capabilities</a></li>
+    <li><a href="#s8"><span class="num">8</span>API REST</a></li>
+    <li><a href="#s9"><span class="num">9</span>Modelo de datos</a></li>
+    <li><a href="#s10"><span class="num">10</span>Panel (sitemap + UX)</a></li>
+    <li><a href="#s11"><span class="num">11</span>Widget embebible</a></li>
+    <li><a href="#s12"><span class="num">12</span>Seguridad &amp; multi-tenancy</a></li>
+    <li><a href="#s13"><span class="num">13</span>Evaluación (RAGAS)</a></li>
+    <li><a href="#s14"><span class="num">14</span>Roadmap M1–M7</a></li>
+    <li><a href="#s15"><span class="num">15</span>Riesgos y mitigaciones</a></li>
+    <li><a href="#appendix"><span class="num">A</span>Anexos</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="doc">
+  <h1>TFM RAG Chatbot Platform — Diseño funcional + roadmap</h1>
+  <div class="meta">
+    Autor: <strong>Ade Cabo Cuartero</strong> ·
+    Fuente: brainstorming sesiones 1-4 (2026-05-19 / 2026-05-20) ·
+    Estado: <span class="badge ok">15/15 secciones cerradas</span> ·
+    Próximo paso: invocar <code>writing-plans</code> tras revisión del usuario
+    y luego extraer OpenSpec proposals (1 CAP → 1 proposal).
+  </div>
+</header>
+
+<!-- =============================================================== -->
+<section id="s1">
+<h2><span class="num">§1</span>Visión, glosario y supuestos</h2>
+
+<h3>Visión</h3>
+<p>Plataforma <strong>open-source, autoalojable, multi-tenant</strong> que permite a un usuario no técnico crear y desplegar <strong>chatbots RAG</strong> de atención al cliente conectados a sus propios documentos y bases de datos, sin escribir código. Cada chatbot se publica como un <strong>widget embebible</strong> en la web del cliente final. El sistema es <strong>agnóstico al proveedor de LLM/embeddings</strong>: catálogo de adaptadores con Ollama local por defecto + endpoints OpenAI-compatibles para proveedores cloud (OpenAI, Groq, Together, OpenRouter, DeepSeek, …).</p>
+
+<h3>Usuarios</h3>
+<ul>
+  <li><strong>Admin del tenant</strong> (en MVP = único usuario por tenant): crea KnowledgeBases, configura chatbots, integra credenciales de proveedores, supervisa conversaciones y obtiene el snippet del widget.</li>
+  <li><strong>Usuario final del widget</strong>: anónimo, chatea con un chatbot embebido en la web del cliente.</li>
+  <li><strong>Investigador (TFM)</strong>: ejecuta evaluación RAGAS por CLI sobre escenarios controlados para validar la calidad del sistema.</li>
+</ul>
+
+<h3>Glosario operativo</h3>
+<table>
+<tr><th>Término</th><th>Definición</th></tr>
+<tr><td><strong>Tenant</strong></td><td>Espacio aislado de datos. En MVP, 1:1 con User (invisible en UI), pero existe en el modelo para aislamiento real (filtros BD, colección Qdrant física, prefix de storage).</td></tr>
+<tr><td><strong>KnowledgeBase (KB)</strong></td><td>Contenedor a nivel tenant que agrupa N <em>DocumentSource</em> + N <em>DatabaseSource</em>. Una KB fija su <code>chunking_config</code> y <code>embedding_selection</code>.</td></tr>
+<tr><td><strong>Source</strong></td><td>Entidad polimórfica del dominio. Subtipos: <code>DocumentSource</code> (archivos chunked+embedded) y <code>DatabaseSource</code> (conexión SQL introspeccionable).</td></tr>
+<tr><td><strong>Chatbot</strong></td><td>Configuración de runtime que <em>referencia</em> 0+ KBs (N:M) e impone <code>llm_selection</code>, <code>system_prompt</code>, <code>pipeline_config</code> y <code>widget_config</code>.</td></tr>
+<tr><td><strong>Agent loop</strong></td><td>Núcleo runtime: en cada turno el LLM elige una de 4 tools (<code>search_docs</code>, <code>query_database</code>, <code>final_answer</code>, <code>abstain</code>) hasta <code>max_retrieval_iterations</code>.</td></tr>
+<tr><td><strong>Capability (CAP-*)</strong></td><td>Unidad funcional dimensionada para razonarse como un todo, implementarse independiente y mapearse a una <strong>OpenSpec proposal</strong>. Una CAP agrupa típicamente varios use cases.</td></tr>
+<tr><td><strong>Provider catalog</strong></td><td>Catálogo de proveedores LLM/embedding/reranker que vive <em>en código</em> (no hay superadmin runtime). Añadir un proveedor = código + redeploy.</td></tr>
+<tr><td><strong>ProviderCredential</strong></td><td>Entidad por tenant con API key cifrada (Fernet). Solo aplica a proveedores <code>TENANT_CREDENTIAL</code>; Ollama es <code>SERVER_ENV</code>.</td></tr>
+</table>
+
+<h3>Supuestos clave del MVP</h3>
+<ol>
+  <li>Multi-tenant <em>real</em> (1 admin = 1 tenant); sin invitaciones de miembros (post-MVP).</li>
+  <li>Autenticación: email+password obligatorio + Google OAuth opcional. JWT 24h sin refresh tokens (re-login al expirar).</li>
+  <li>El catálogo de proveedores vive en código: <em>no</em> hay superadmin.</li>
+  <li>La ingesta es <strong>asíncrona</strong> con <code>FastAPI BackgroundTasks</code> + tabla <code>ingestion_jobs</code> + polling. Sin Celery/Redis en MVP.</li>
+  <li>Vector store: siempre Qdrant. <strong>Una colección física por <code>(tenant, dim)</code></strong> — permite múltiples embeddings por tenant.</li>
+  <li>Ollama corre <strong>local junto al backend</strong> (servicio en <code>docker-compose.yml</code>); cada tenant nuevo arranca con un <code>ProviderCredential</code> Ollama default.</li>
+  <li>Streaming parcial: las <strong>iteraciones del loop agéntico</strong> se emiten en vivo vía SSE (tool en curso, estado de cada step) para que el usuario vea el "pensamiento" del agente. La <strong>respuesta final</strong> puede entregarse completa o en streaming según el endpoint.</li>
+  <li>Idioma de la plataforma: <strong>español</strong> para UI/spec/log; código y nombres de clase en inglés.</li>
+  <li>Stack frontend: <strong>Next.js (App Router) + NextAuth + shadcn/ui</strong> (alineado con la memoria del TFM).</li>
+  <li>Deploy del MVP: <strong>solo local</strong> con <code>docker-compose up</code> (tribunal corre el stack).</li>
+  <li>Licencia: AGPLv3 (del PDF del TFM).</li>
+</ol>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s2">
+<h2><span class="num">§2</span>Mapa de módulos</h2>
+
+<p>Arquitectura <strong>hexagonal</strong> (puertos y adaptadores). Capa de dominio pura; capa de aplicación con use cases; capa de infraestructura con adapters concretos y entry points HTTP/CLI.</p>
+
+<div class="rectify">
+  <code>application/sources/</code> renombrado a <code>application/knowledge/</code> tras §6. Añadido subpackage <code>adapters/rerankers/</code>. Frontend gana <code>/knowledge</code> como top-level junto a <code>/chatbots</code> y <code>/settings</code>.
+</div>
+
+<h3>Backend</h3>
+<pre>backend/
+├── domain/
+│   ├── entities/       User, Tenant, Chatbot, KnowledgeBase, Source,
+│   │                   DocumentSource, DatabaseSource, ChatSession,
+│   │                   ChatMessage, IngestionJob, WidgetConfig,
+│   │                   PromptTemplate, ProviderCredential
+│   ├── value_objects/  ChunkingConfig, PipelineConfig, GenerationConfig,
+│   │                   LLMSelection, EmbeddingSelection, RouteDecision,
+│   │                   Chunk, RetrievedChunk, Citation,
+│   │                   RetrievalIteration, ToolCall
+│   ├── ports/          LLMProvider, EmbeddingProvider, VectorStore,
+│   │                   Reranker, DocumentLoader, CloudStorageConnector,
+│   │                   SQLDataSource, Chunker, Router, QueryGuard,
+│   │                   OAuthVerifier, SecretEncryptor
+│   ├── errors/         auth.py, chatbot.py, knowledge.py, chat.py,
+│   │                   integrations.py, common.py
+│   └── catalog/        llm_providers.py, embedding_providers.py,
+│                       reranker_providers.py, cloud_storage.py,
+│                       sql_drivers.py
+├── adapters/
+│   ├── llm/                ollama, openai, openai_compat
+│   ├── embeddings/         ollama, openai_compat
+│   ├── vector_store/       qdrant
+│   ├── rerankers/          bge_cross_encoder, cohere
+│   ├── document_loaders/   pdf, docx, txt, csv, markdown, xlsx
+│   ├── cloud_storage/      gdrive, s3
+│   ├── sql_sources/        postgres, mysql
+│   ├── chunkers/           fixed_size, by_structure, semantic
+│   ├── routers/            llm_function_calling
+│   ├── guards/             sqlglot_ast, llm_semantic, layered
+│   ├── oauth/              google_oauth_verifier
+│   └── secrets/            fernet_encryptor
+├── application/
+│   ├── auth/               RegisterUser, LoginUser, LoginWithGoogle,
+│   │                       BootstrapTenant
+│   ├── chatbot_config/     CreateChatbot, UpdateChatbot, ListChatbots,
+│   │                       GetChatbot, DeleteChatbot
+│   ├── knowledge/          CreateKnowledgeBase, UpdateKnowledgeBase,
+│   │                       ListKnowledgeBases, GetKnowledgeBase,
+│   │                       DeleteKnowledgeBase,
+│   │                       AttachDocumentSource, AttachDatabaseSource,
+│   │                       IngestSource, IntrospectDatabaseSource,
+│   │                       ReindexSource, DetachSource, ListSources,
+│   │                       TestSourceConnection
+│   ├── chat/               AnswerQuery, RetrieveDocs, ExecuteSQL,
+│   │                       ListSessions, GetSession
+│   ├── integrations/       UpsertProviderCredential, ListCredentials,
+│   │                       DeleteCredential, TestCredential
+│   ├── widget_config/      UpdateWidgetConfig, GetPublicWidgetConfig
+│   └── evaluation/         RunRagasEvaluation
+├── infrastructure/
+│   ├── api/routers/        auth, chatbots, knowledge_bases, sources,
+│   │                       jobs, sessions, integrations, providers,
+│   │                       widget_config, public_chat,
+│   │                       public_widget_config
+│   ├── api/middleware/     TenantScopingMiddleware, RateLimitMiddleware,
+│   │                       CORSPerChatbotMiddleware
+│   ├── api/schemas/        Pydantic req/resp
+│   ├── persistence/        SQLAlchemy models + repositorios
+│   ├── jobs/               BackgroundTasksRunner, IngestionJobsRepository
+│   ├── auth/               PasswordHasher, JWTService, GoogleOAuthClient
+│   └── settings/           Pydantic Settings desde .env
+├── cli/                    eval_ragas, seed
+└── composition_root.py     DI: cablea adapters → ports
+
+frontend/        (Next.js App Router + NextAuth + shadcn/ui)
+├── app/
+│   ├── (auth)/             login, register, api/auth/[...nextauth]
+│   │                       (NextAuth: Google + Credentials providers)
+│   ├── (panel)/
+│   │   ├── page.tsx        Dashboard
+│   │   ├── chatbots/       wizard, [id]/tabs (Resumen, Playground,
+│   │   │                   Conversaciones, Widget, Configuración)
+│   │   ├── knowledge/      lista, new, [id]/tabs (Resumen, Documentos,
+│   │   │                   Bases de datos, Chatbots conectados)
+│   │   └── settings/       cuenta, integraciones, tenant
+│   └── api/                routes proxy si hace falta (NextAuth + APIs)
+├── components/             componentes shadcn/ui personalizados
+├── lib/
+│   ├── api/                cliente generado del OpenAPI
+│   ├── auth.ts             config NextAuth (Google + JWT del backend)
+│   └── query-client.ts     TanStack Query
+└── widget-preview/         renderiza el bundle real con props
+
+widget/          (bundle JS separado)
+├── src/                    Preact + signals + Tailwind con prefijo tfm-
+├── dist/widget.js          servido por backend como activo estático
+└── README.md
+
+infra/
+├── docker-compose.yml      Postgres + Qdrant + Ollama + backend + frontend
+│                           (Ollama es servicio obligatorio; backend espera
+│                            su healthcheck antes de arrancar)
+├── docker-compose.eval.yml perfil para CI/eval con deps congeladas
+├── migrations/             Alembic
+└── seed/                   Ollama pull de modelos default (bge-m3,
+                            llama3.1) al primer arranque
+
+scripts/
+├── eval_ragas.py
+└── load_dataset.py
+
+datasets/                   3 escenarios + abstain
+</pre>
+
+<h3>Dependencias entre capas (regla)</h3>
+<p><code>domain/</code> no depende de nada externo. <code>application/</code> depende solo de <code>domain/</code>. <code>adapters/</code> implementa <code>domain/ports/</code>. <code>infrastructure/</code> orquesta y compone. <code>composition_root.py</code> es el único sitio donde se cruzan las flechas.</p>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s3">
+<h2><span class="num">§3</span>Flujos end-to-end</h2>
+
+<p>Ocho flujos cubren el journey de 21 pasos. Los flujos <strong>B</strong> y <strong>C</strong> son ahora <em>agentic loops</em> en lugar de pipelines lineales. <strong>F</strong> y <strong>G</strong> pertenecen a una KnowledgeBase, no a un chatbot. <strong>H</strong> es nuevo: diagrama de secuencia del loop agéntico.</p>
+
+<div class="rectify">
+  Reescritos respecto a la primera versión: B y C ahora son agentic loops; F y G pertenecen a una KB (no a un chatbot); flujo H nuevo.
+</div>
+
+<h3>A — Ingesta de archivos locales</h3>
+<pre>Cliente panel  →  POST /api/knowledge-bases/{kb}/sources/documents  (multipart)
+              →  persistir DocumentSource (status=not_started)
+              ←  201 DocumentSource
+
+Cliente panel  →  POST /api/sources/{id}/ingest
+              →  crear IngestionJob (status=queued)
+              →  FastAPI BackgroundTasks dispara worker
+                    worker: DocumentLoader.load() (segun extensión)
+                          → Chunker.chunk(ChunkingConfig de la KB)
+                          → EmbeddingProvider.embed_batch(EmbeddingSelection de la KB)
+                          → VectorStore.upsert(payload {tenant_id, kb_id, source_id, ...})
+                          → IngestionJob.status = done
+              ←  202 IngestionJob
+
+Cliente panel  →  GET /api/ingestion-jobs/{job_id}  (polling 2s)
+              ←  200 IngestionJob (status: queued | running | done | failed)</pre>
+
+<h3>B — Chat documental (agentic, vía playground o widget)</h3>
+<pre>Cliente  →  POST /api/chatbots/{id}/chat  (o /api/public/...)
+        →  AnswerQuery.execute(chatbot_id, session_id?, message)
+              loop (hasta max_retrieval_iterations):
+                  Router.route(state, available_tools)  → ToolCall
+                  if tool == search_docs:
+                      RetrieveDocs(kb_ids, query, top_k, threshold)
+                      → embed + Qdrant filtro + opcional Reranker
+                  elif tool == query_database:
+                      ExecuteSQL(database_source_id, nl_query)
+                      → text2SQL + 3 guards + execute read-only
+                  elif tool == final_answer:
+                      LLMProvider.generate(context acumulado)
+                      break
+                  elif tool == abstain:
+                      respuesta honesta de "no puedo"
+                      break
+              persistir ChatMessage con metadata.iterations[]
+        ←  200 { session_id, message }</pre>
+
+<h3>C — Chat con docs + SQL (caso compuesto)</h3>
+<p>Es el mismo flujo B; el agentic loop decide en cada turno entre <code>search_docs</code> y <code>query_database</code>. No hay pipeline lineal: el LLM puede alternar tools, hacer una búsqueda, ver el resultado, decidir hacer otra, etc., hasta el tope.</p>
+
+<h3>D — Login/registro</h3>
+<pre>email+pw:
+  Cliente  →  POST /api/auth/register {email,password}
+          →  RegisterUser.execute → BootstrapTenant.execute
+                                    (crea Tenant
+                                     + ProviderCredential Ollama default
+                                       (config_source=SERVER_ENV))
+                                    (las colecciones Qdrant se crean
+                                     on-demand al crear la 1ª KB con
+                                     un dim nuevo en el tenant)
+          ←  201 {user, tenant, token (JWT 24h)}
+
+google oauth:
+  Cliente (Next)  →  obtiene id_token de Google
+              →  POST /api/auth/login/google {google_id_token}
+              →  GoogleOAuthVerifier valida (firma, aud, iss, exp)
+              →  busca user por email; si no existe → RegisterUser + BootstrapTenant
+              ←  200 {user, tenant, token}</pre>
+
+<h3>E — Crear chatbot (wizard single-POST)</h3>
+<pre>Wizard cliente (7 pasos):  Identidad → Cerebro → Conocimiento → Pipeline
+                            → Widget → Revisión → Crear
+  Estado se mantiene en cliente; NO hay draft en BD.
+
+Cliente  →  POST /api/chatbots {name, system_prompt, llm_selection,
+                                 kb_ids[], pipeline_config, widget_config}
+        →  validar embedding compatibility cross-KB
+              si KBs[].embedding_selection no son iguales → 409 IncompatibleEmbeddingsError
+        →  persistir Chatbot + tabla N:M chatbot_knowledge_base
+        ←  201 Chatbot</pre>
+
+<h3>F — Ingesta cloud (pertenece a una KB)</h3>
+<pre>Admin conecta credenciales OAuth de cloud (gdrive/s3) en /settings/integrations
+Admin va a /knowledge/{kb}/documentos y "Añadir desde cloud"
+  Cliente  →  POST /api/knowledge-bases/{kb}/sources/documents
+              {cloud_folder_ref: {provider, folder_id, credential_id}}
+          →  CloudStorageConnector.list_folder → registra DocumentSource por archivo
+          ←  201 DocumentSource[]
+  Cliente  →  POST /api/sources/{id}/ingest  (idem A; downloader → loader → chunker → ...)
+Re-sync: manual desde panel (sin watcher en MVP).</pre>
+
+<h3>G — Introspección de BD SQL (pertenece a una KB)</h3>
+<pre>Cliente  →  POST /api/knowledge-bases/{kb}/sources/test-connection
+            {spec: {driver, params, credential_id}}
+        ←  200 {ok, error?}
+
+Cliente  →  POST /api/knowledge-bases/{kb}/sources/databases
+            {driver, credential_id, params}
+        →  registra DatabaseSource
+        ←  201 DatabaseSource
+
+Cliente  →  POST /api/sources/{id}/introspect   (síncrono)
+        →  SQLDataSource.introspect_schema → SchemaSnapshot
+        →  persistir snapshot dentro de la entidad (sources.payload.schema_snapshot)
+        ←  200 SchemaSnapshot</pre>
+
+<h3>H — Ciclo agéntico de retrieval <span class="badge">NUEVO</span></h3>
+<p><strong>Streaming SSE:</strong> los endpoints de chat (panel y widget) usan <code>text/event-stream</code>. El cliente recibe eventos en vivo durante el loop para que el usuario vea el "pensamiento" del agente (qué tool está usando, en qué iteración va). La respuesta final viaja como un último evento del stream.</p>
+<pre>Diagrama de secuencia (extracto):
+
+    User ─→ Backend                                      Router (LLM)
+            │                                            │
+            │  POST /api/.../chat (SSE)                  │
+            │  AnswerQuery(msg) abre stream              │
+            │                                            │
+            │  evt: { type: 'iteration_start', n: 1 } ───────────→ User
+            │                                            │
+            │  state = {query, history, tools}           │
+            │ ────route(state, tools)───────────────────▶│
+            │ ◀──ToolCall(search_docs, {q="...", k=8})───│
+            │  evt: { type: 'tool_call',                 │
+            │         tool: 'search_docs', args } ───────────────→ User
+            │                                            │
+            │  → RetrieveDocs.execute(kb_ids, q, k)      │
+            │      embed → Qdrant search                 │
+            │      [reranker opt-in si enable_reranker]  │
+            │  ← RetrievedChunk[]                        │
+            │  evt: { type: 'tool_result',               │
+            │         summary, latency_ms } ─────────────────────→ User
+            │                                            │
+            │  state += retrieval_iteration              │
+            │  evt: { type: 'iteration_start', n: 2 } ───────────→ User
+            │ ────route(state, tools)───────────────────▶│
+            │ ◀──ToolCall(query_database, {sql_nl=...})──│  (decide otra tool)
+            │  evt: { type: 'tool_call',                 │
+            │         tool: 'query_database', args } ────────────→ User
+            │                                            │
+            │  → ExecuteSQL.execute(db_src, nl)          │
+            │      text2SQL → guard1 → guard2 → guard3   │
+            │      → execute read-only                   │
+            │  ← SQLResult                               │
+            │  evt: { type: 'tool_result', ... } ────────────────→ User
+            │                                            │
+            │  state += retrieval_iteration              │
+            │ ────route(state, tools)───────────────────▶│
+            │ ◀──ToolCall(final_answer, {...})───────────│
+            │                                            │
+            │  evt: { type: 'generating' } ──────────────────────→ User
+            │  LLMProvider.generate(prompt completo)     │
+            │  persist ChatMessage(role=assistant,       │
+            │     citations, metadata.iterations[])      │
+            │  evt: { type: 'final_answer',              │
+            │         message: {id, content, citations} } ───────→ User
+            │  evt: { type: 'done' } ────────────────────────────→ User
+            │                                            │
+            └─→ Stream cerrado.
+
+Tipos de evento SSE (catálogo cerrado):
+  iteration_start { n }
+  tool_call       { tool, args }
+  tool_result     { summary, latency_ms }
+  generating      { }
+  final_answer    { message: { id, content, citations[] } }
+  abstain         { reason }
+  forced_close    { reason: 'max_iterations' }
+  error           { code, message }
+  done            { }
+
+Invariantes:
+  - El loop no puede exceder max_retrieval_iterations (1-5, default 3).
+  - Si se alcanza el tope sin final_answer → forced_close + final_answer
+    con lo acumulado; metadata.forced_close=true.
+  - abstain corta el loop con un mensaje "no puedo responder eso".
+  - Si agentic_mode=false, el router se invoca UNA sola vez y se ejecuta
+    UNA sola tool antes de generar (pipeline lineal compatible).
+  - El stream NUNCA emite tokens del LLM individualmente en MVP — solo
+    el evento 'generating' y luego 'final_answer' con el mensaje completo.
+    Esto da la sensación de "el agente está trabajando" sin requerir
+    streaming token-a-token del LLM.</pre>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s4">
+<h2><span class="num">§4</span>Dominio y contratos</h2>
+
+<div class="rectify">
+  <code>KnowledgeSource</code> sustituido por <code>KnowledgeBase</code> + <code>Source</code> polimórfico. <code>Chatbot</code> pierde sources, gana N:M con KBs. <code>PipelineConfig</code> ampliado con campos del loop agéntico. Nuevo VO <code>RetrievalIteration</code>. Nuevos errores en <code>knowledge.py</code>.
+</div>
+
+<h3>Entidades</h3>
+<table>
+<tr><th>Entidad</th><th>Campos clave</th></tr>
+<tr><td><code>User</code></td><td><code>id, email, password_hash?, google_sub?, tenant_id, created_at</code></td></tr>
+<tr><td><code>Tenant</code></td><td><code>id, name, qdrant_collection, storage_prefix, created_at</code></td></tr>
+<tr><td><code>ProviderCredential</code></td><td><code>id, tenant_id, provider_id, label, api_key_encrypted, base_url?, config_source</code></td></tr>
+<tr><td><code>KnowledgeBase</code></td><td><code>id, tenant_id, name, description, chunking_config, embedding_selection, sources: list[Source]</code></td></tr>
+<tr><td><code>Source</code> (base)</td><td><code>id, kb_id, type, ingest_status, last_ingest_at, error?</code></td></tr>
+<tr><td><code>DocumentSource</code></td><td>extiende Source: <code>kind: 'upload'|'cloud', storage_uri | cloud_folder_ref, filename, mime_type, size_bytes</code></td></tr>
+<tr><td><code>DatabaseSource</code></td><td>extiende Source: <code>driver, credential_id_encrypted, host, port, db_name, ssl_mode, schema_snapshot</code></td></tr>
+<tr><td><code>Chatbot</code></td><td><code>id, tenant_id, name, description, system_prompt, llm_selection, router_llm_selection?, pipeline_config, widget_config, kb_ids: list[uuid]</code> (N:M)</td></tr>
+<tr><td><code>ChatSession</code></td><td><code>id, chatbot_id, tenant_id, origin: 'playground'|'widget', public_session_cookie?, created_at, last_activity_at</code></td></tr>
+<tr><td><code>ChatMessage</code></td><td><code>id, session_id, role, content, citations: list[Citation], metadata: { iterations: list[RetrievalIteration] }, created_at</code></td></tr>
+<tr><td><code>IngestionJob</code></td><td><code>id, source_id, tenant_id, status, progress, error?, started_at, finished_at?</code></td></tr>
+<tr><td><code>WidgetConfig</code></td><td>embebido en Chatbot: <code>colors, font_family, position, avatar_url?, greeting, allowed_domains</code></td></tr>
+<tr><td><code>PromptTemplate</code></td><td><code>id, key, content</code> (catálogo de plantillas opcionales del system prompt)</td></tr>
+</table>
+
+<h3>Value objects</h3>
+<table>
+<tr><th>VO</th><th>Campos</th></tr>
+<tr><td><code>LLMSelection</code></td><td><code>{provider_id, credential_id?, model_id}</code> — credential_id solo para <code>TENANT_CREDENTIAL</code>.</td></tr>
+<tr><td><code>EmbeddingSelection</code></td><td><code>{provider_id, credential_id?, model_id, dim}</code></td></tr>
+<tr><td><code>ChunkingConfig</code></td><td><code>{strategy: 'fixed'|'by_structure'|'semantic', size, overlap, ...}</code></td></tr>
+<tr><td><code>PipelineConfig</code></td><td><code>{top_k, score_threshold, agentic_mode, max_retrieval_iterations (1-5), enable_reranker, reranker_initial_top_k, abstain_when_insufficient, router_llm_selection?}</code></td></tr>
+<tr><td><code>GenerationConfig</code></td><td><code>{temperature, max_tokens, top_p, ...}</code></td></tr>
+<tr><td><code>RouteDecision</code> / <code>ToolCall</code></td><td><code>{tool: 'search_docs'|'query_database'|'final_answer'|'abstain', args}</code></td></tr>
+<tr><td><code>Chunk</code></td><td><code>{id, content, metadata}</code> (antes de embed)</td></tr>
+<tr><td><code>RetrievedChunk</code></td><td><code>{id, content, source_id, source_type, score, metadata}</code></td></tr>
+<tr><td><code>Citation</code></td><td><code>{source_id, source_name, location, chunk_id, score}</code> — no se persiste el contenido en Postgres; se resuelve bajo demanda desde Qdrant.</td></tr>
+<tr><td><code>RetrievalIteration</code> <span class="badge">NUEVO</span></td><td><code>{iter_n, tool, args, result_summary, latency_ms}</code></td></tr>
+</table>
+
+<h3>Puertos (contratos Python)</h3>
+<pre><code>from abc import ABC, abstractmethod
+from typing import AsyncIterator
+
+class LLMProvider(ABC):
+    @abstractmethod
+    async def generate(self, prompt: str, config: GenerationConfig,
+                       tools: list[ToolSpec] | None = None) -&gt; LLMResponse: ...
+    @abstractmethod
+    async def stream(self, prompt: str, config: GenerationConfig) \
+            -&gt; AsyncIterator[str]: ...  # no usado en MVP
+    @abstractmethod
+    async def list_models(self) -&gt; list[str]: ...
+    supports_tool_calling: bool
+
+class EmbeddingProvider(ABC):
+    @abstractmethod
+    async def embed_text(self, text: str) -&gt; list[float]: ...
+    @abstractmethod
+    async def embed_batch(self, texts: list[str]) -&gt; list[list[float]]: ...
+    @abstractmethod
+    def dimension(self, model_id: str) -&gt; int: ...
+
+class VectorStore(ABC):
+    @abstractmethod
+    async def ensure_collection(self, tenant_id: UUID, dim: int) -&gt; None: ...
+    @abstractmethod
+    async def upsert(self, tenant_id: UUID, points: list[VectorPoint]) -&gt; None: ...
+    @abstractmethod
+    async def search(self, tenant_id: UUID, kb_ids: list[UUID],
+                     query_vec: list[float], top_k: int,
+                     threshold: float | None) -&gt; list[RetrievedChunk]: ...
+    @abstractmethod
+    async def delete_by_source(self, tenant_id: UUID, source_id: UUID) -&gt; None: ...
+    @abstractmethod
+    async def delete_collection(self, tenant_id: UUID) -&gt; None: ...
+
+class Reranker(ABC):  # NUEVO
+    @abstractmethod
+    async def rerank(self, query: str, candidates: list[RetrievedChunk],
+                     top_k: int) -&gt; list[RetrievedChunk]: ...
+
+class DocumentLoader(ABC):
+    extensions: set[str]
+    @abstractmethod
+    async def load(self, uri: str) -&gt; LoadedDocument: ...
+
+class CloudStorageConnector(ABC):
+    @abstractmethod
+    async def list_folder(self, credential: ProviderCredential,
+                          folder_ref: str) -&gt; list[CloudFile]: ...
+    @abstractmethod
+    async def download(self, credential: ProviderCredential,
+                       file_ref: str) -&gt; bytes: ...
+    @abstractmethod
+    async def test_credential(self, credential: ProviderCredential) -&gt; bool: ...
+
+class SQLDataSource(ABC):
+    driver: str
+    @abstractmethod
+    async def test_connection(self, spec: SQLConnectionSpec) -&gt; bool: ...
+    @abstractmethod
+    async def introspect_schema(self, spec: SQLConnectionSpec) -&gt; SchemaSnapshot: ...
+    @abstractmethod
+    async def execute_readonly(self, spec: SQLConnectionSpec, sql: str,
+                               max_rows: int, timeout_s: float) -&gt; SQLResult: ...
+
+class Chunker(ABC):
+    @abstractmethod
+    def chunk(self, doc: LoadedDocument, config: ChunkingConfig) \
+            -&gt; list[Chunk]: ...
+
+class Router(ABC):
+    @abstractmethod
+    async def route(self, state: ConversationState,
+                    available_tools: list[ToolSpec]) -&gt; ToolCall: ...
+
+class QueryGuard(ABC):
+    @abstractmethod
+    async def validate(self, sql: str, schema: SchemaSnapshot,
+                       judge_llm: LLMProvider | None) -&gt; GuardVerdict: ...
+
+class OAuthVerifier(ABC):
+    @abstractmethod
+    async def verify_token(self, id_token: str) -&gt; OAuthProfile: ...
+
+class SecretEncryptor(ABC):
+    @abstractmethod
+    def encrypt(self, plaintext: bytes) -&gt; bytes: ...
+    @abstractmethod
+    def decrypt(self, ciphertext: bytes) -&gt; bytes: ...
+</code></pre>
+
+<h3>Errores de dominio</h3>
+<pre><code># domain/errors/common.py
+class DomainError(Exception): ...
+class NotFoundError(DomainError): ...
+class ValidationError(DomainError): ...
+class TenantScopeViolation(DomainError): ...
+
+# domain/errors/knowledge.py  (NUEVO en §6)
+class KnowledgeBaseNotFoundError(NotFoundError): ...
+class KnowledgeBaseInUseError(DomainError): ...
+class IncompatibleEmbeddingsError(ValidationError): ...
+class SourceNotFoundError(NotFoundError): ...
+class UnsupportedDocumentTypeError(DomainError): ...
+class SchemaIntrospectionError(DomainError): ...
+
+# domain/errors/chatbot.py
+class ChatbotNotFoundError(NotFoundError): ...
+
+# domain/errors/chat.py
+class SessionNotFoundError(NotFoundError): ...
+class GuardRejectedError(DomainError): ...
+
+# domain/errors/integrations.py
+class CredentialNotFoundError(NotFoundError): ...
+class CredentialTestFailedError(DomainError): ...
+class SecretDecryptError(DomainError): ...
+
+# domain/errors/auth.py
+class InvalidCredentialsError(DomainError): ...
+class TokenInvalidError(DomainError): ...</code></pre>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s5">
+<h2><span class="num">§5</span>Adaptadores MVP</h2>
+
+<div class="rectify">
+  Añadido <code>adapters/rerankers/</code> (BGE local + Cohere opcional). <code>document_loaders/</code> ahora incluye <code>xlsx</code>. <code>cloud_storage/</code> queda en <code>gdrive + s3</code> (sin Dropbox). <code>sql_sources/</code>: <code>postgres + mysql</code>.
+</div>
+
+<table>
+<tr><th>Puerto</th><th>Adapters MVP</th><th>Notas</th></tr>
+<tr><td><code>LLMProvider</code></td><td><code>OllamaLLMAdapter</code>, <code>OpenAILLMAdapter</code>, <code>OpenAICompatLLMAdapter</code></td><td>Cubre Ollama local + OpenAI + cualquier Chat-Completions-compatible (Groq, Together, OpenRouter, DeepSeek, GitHub Models, NIM).</td></tr>
+<tr><td><code>EmbeddingProvider</code></td><td><code>OllamaEmbeddingAdapter</code>, <code>OpenAICompatEmbeddingAdapter</code></td><td>Modelos por defecto: bge-m3, nomic-embed-text, embeddinggemma:300m (Ollama); text-embedding-3-small/-large (OpenAI).</td></tr>
+<tr><td><code>VectorStore</code></td><td><code>QdrantVectorStore</code></td><td>qdrant-client async. Colección física por tenant + filtro por <code>tenant_id</code> en payload.</td></tr>
+<tr><td><code>Reranker</code> <span class="badge">NUEVO</span></td><td><code>BGECrossEncoderReranker</code> (local, bge-reranker-v2-m3), <code>CohereRerankerAdapter</code> (API, opcional)</td><td>Solo se carga si <code>enable_reranker=true</code> en el chatbot.</td></tr>
+<tr><td><code>DocumentLoader</code></td><td><code>PDFDocumentLoader</code> (pymupdf), <code>DOCXDocumentLoader</code> (python-docx), <code>TXTDocumentLoader</code> (stdlib), <code>CSVDocumentLoader</code>, <code>MarkdownDocumentLoader</code> (markdown-it-py), <code>XLSXDocumentLoader</code> (openpyxl)</td><td>Una hoja XLSX → un Document; cada fila o bloque → un chunk con el header como metadata.</td></tr>
+<tr><td><code>CloudStorageConnector</code></td><td><code>GoogleDriveConnector</code> (google-api-python-client, OAuth), <code>S3Connector</code> (aioboto3, access+secret keys)</td><td>Dropbox excluido (Q5.2 confirmada).</td></tr>
+<tr><td><code>SQLDataSource</code></td><td><code>PostgresSQLDataSource</code> (SQLAlchemy Core + asyncpg), <code>MySQLSQLDataSource</code> (SQLAlchemy Core + aiomysql)</td><td>Capas defensivas: <code>SET TRANSACTION READ ONLY</code> + <code>statement_timeout</code>.</td></tr>
+<tr><td><code>Chunker</code></td><td><code>FixedSizeChunker</code>, <code>StructureChunker</code>, <code>SemanticChunker</code></td><td>Semantic opcional (caro). Preset Simple = fixed o structure según content_hint.</td></tr>
+<tr><td><code>Router</code></td><td><code>LLMFunctionCallingRouter</code></td><td>Único adapter. Usa el LLM (router_llm_selection si está, o llm_selection).</td></tr>
+<tr><td><code>QueryGuard</code></td><td><code>LayeredQueryGuard</code></td><td>3 capas en orden: AST sqlglot → LLM semántico → privilegio mínimo (conexión read-only). Ver §12.</td></tr>
+<tr><td><code>OAuthVerifier</code></td><td><code>GoogleOAuthVerifier</code></td><td>google-auth, valida firma + aud + iss + exp.</td></tr>
+<tr><td><code>SecretEncryptor</code></td><td><code>FernetSecretEncryptor</code></td><td>cryptography.fernet con clave maestra del .env.</td></tr>
+</table>
+
+<h3>Dependencias backend pinned</h3>
+<pre>fastapi, uvicorn, pydantic, pydantic-settings, sqlalchemy[asyncio], alembic,
+asyncpg, aiomysql, qdrant-client, openai, httpx, pymupdf, python-docx,
+markdown-it-py, openpyxl, sqlglot, cryptography, google-auth,
+google-api-python-client, aioboto3, sentence-transformers (BGE reranker),
+cohere (opcional), ragas, datasets, slowapi (rate limit), structlog,
+pytest, pytest-asyncio, pytest-cov, ruff, mypy</pre>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s6">
+<h2><span class="num">§6</span>Casos de uso</h2>
+
+<p>34 use cases agrupados en 8 packages. Pivots clave aplicados desde la sesión 2: separación módulo LLM ↔ módulo RAG (las fuentes salen del chatbot a nivel tenant); KnowledgeBase como contenedor polimórfico; wizard cliente puro con un único POST final; RAG agéntico.</p>
+
+<h3>application/auth/</h3>
+<ul>
+  <li><code>RegisterUser(email, password) → User</code></li>
+  <li><code>LoginUser(email, password) → JWT</code></li>
+  <li><code>LoginWithGoogle(google_id_token) → JWT</code></li>
+  <li><code>BootstrapTenant(user_id) → Tenant</code> — crea Tenant + colección Qdrant + ProviderCredential Ollama default (<code>config_source=SERVER_ENV</code>).</li>
+</ul>
+
+<h3>application/chatbot_config/</h3>
+<ul>
+  <li><code>CreateChatbot(payload) → Chatbot</code> — POST único; valida embedding compatibility cross-KB.</li>
+  <li><code>UpdateChatbot(chatbot_id, patch) → Chatbot</code></li>
+  <li><code>ListChatbots(tenant_id, page) → Page[Chatbot]</code></li>
+  <li><code>GetChatbot(chatbot_id) → Chatbot</code></li>
+  <li><code>DeleteChatbot(chatbot_id) → None</code> — cascada acotada: sesiones + mensajes; no toca KBs (N:M).</li>
+</ul>
+
+<h3>application/knowledge/</h3>
+<p><strong>KB-level:</strong></p>
+<ul>
+  <li><code>CreateKnowledgeBase(tenant_id, name, chunking_config, embedding_selection) → KB</code></li>
+  <li><code>UpdateKnowledgeBase(kb_id, patch) → KB</code> — si cambia chunking o embedding ⇒ dispara <code>ReindexSource</code> para todos los DocumentSource de la KB; UI advierte.</li>
+  <li><code>ListKnowledgeBases(tenant_id, page) → Page[KB]</code></li>
+  <li><code>GetKnowledgeBase(kb_id) → KB + sources[]</code></li>
+  <li><code>DeleteKnowledgeBase(kb_id) → None</code> — bloquea si algún chatbot referencia: <code>KnowledgeBaseInUseError</code>.</li>
+</ul>
+<p><strong>Source-level:</strong></p>
+<ul>
+  <li><code>AttachDocumentSource(kb_id, upload | cloud_folder_ref) → DocumentSource</code></li>
+  <li><code>AttachDatabaseSource(kb_id, driver, credential_id, params) → DatabaseSource</code></li>
+  <li><code>IngestSource(source_id) → IngestionJob</code> — background; aplica sólo a DocumentSource; usa chunking + embedding de la KB.</li>
+  <li><code>IntrospectDatabaseSource(source_id) → SchemaSnapshot</code> — síncrono; persiste en la entidad.</li>
+  <li><code>ReindexSource(source_id) → IngestionJob</code></li>
+  <li><code>DetachSource(source_id) → None</code></li>
+  <li><code>ListSources(kb_id) → list[Source]</code></li>
+  <li><code>TestSourceConnection(spec) → ConnectionResult</code> — pre-attach; no persiste.</li>
+</ul>
+
+<h3>application/chat/</h3>
+<ul>
+  <li><code>AnswerQuery(chatbot_id, session_id?, user_message) → AnswerDTO</code> — agent loop; persiste <code>RetrievalIteration[]</code> en <code>ChatMessage.metadata</code>.</li>
+  <li><code>RetrieveDocs(kb_ids, query, top_k, threshold) → list[RetrievedChunk]</code> — embed + vector search + opcional reranker.</li>
+  <li><code>ExecuteSQL(database_source_id, nl_query) → SQLResult</code> — text2SQL + 3 capas de guards.</li>
+  <li><code>ListSessions(chatbot_id, page) → Page[ChatSession]</code></li>
+  <li><code>GetSession(session_id) → ChatSession + messages</code></li>
+</ul>
+
+<h3>application/integrations/</h3>
+<ul>
+  <li><code>UpsertProviderCredential(tenant_id, provider_id, label, api_key, base_url?) → PC</code></li>
+  <li><code>ListCredentials(tenant_id) → list[PCView]</code></li>
+  <li><code>DeleteCredential(credential_id) → None</code></li>
+  <li><code>TestCredential(credential_id, model_id) → TestResult</code></li>
+</ul>
+
+<h3>application/widget_config/</h3>
+<ul>
+  <li><code>UpdateWidgetConfig(chatbot_id, config) → WidgetConfig</code></li>
+  <li><code>GetPublicWidgetConfig(chatbot_id) → PublicWidgetConfigDTO</code></li>
+</ul>
+
+<h3>application/evaluation/</h3>
+<ul>
+  <li><code>RunRagasEvaluation(chatbot_id, dataset_path, scenario) → EvaluationReport</code> — solo CLI.</li>
+</ul>
+
+<h3>Decisiones cerradas en §6 (no re-litigar)</h3>
+<p>Q6.1 (no <code>ActivateChatbot</code> — wizard single-POST), Q6.2 (TestSourceConnection / TestCredential son use cases), Q6.3 (RetrieveDocs y ExecuteSQL son testables aislados), Q6.4 (KB a nivel tenant, polimórfica), Q6.5 (N:M chatbot-KB), Q6.6 (indexación una sola vez por documento dentro de su KB), Q6.7 (KnowledgeBase + Source polimórfico), Q6.8 (validación dura de embedding compatibility), Q6.9 (router elige UN solo DatabaseSource por turno), Q6.10 (chatbots con 0 KBs permitidos = LLM puro), Q6.11 (Reranker como puerto nuevo), Q6.12 (<code>agentic_mode</code> configurable, default true), Q6.13 (<code>max_retrieval_iterations</code> 1-5, default 3, UX "Profundidad"), Q6.14 (<code>abstain</code> tool explícita).</p>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s7">
+<h2><span class="num">§7</span>Catálogo de capabilities (fuente para OpenSpec)</h2>
+
+<p>17 CAPs cubren las 34 use cases + 4 transversales de infraestructura. Cada CAP mapeará 1:1 a una OpenSpec proposal en la fase de implementación. Granularidad: <em>feature de usuario</em>. Nivel de detalle: <em>mínimo del handover</em> (los AC Given/When/Then viven en las proposals, no aquí).</p>
+
+<h3>Vista rápida (id + nombre + dominio)</h3>
+<table>
+<tr><th>#</th><th>ID</th><th>Nombre</th><th>Dominio</th></tr>
+<tr><td>1</td><td><code>CAP-AUTH-IDENTITY</code></td><td>Identidad, sesión y bootstrap de tenant</td><td>AUTH</td></tr>
+<tr><td>2</td><td><code>CAP-INTEG-CREDENTIALS</code></td><td>Credenciales de proveedores LLM/embedding</td><td>INTEG</td></tr>
+<tr><td>3</td><td><code>CAP-CHATBOT-LIFECYCLE</code></td><td>CRUD de chatbots (wizard single-POST)</td><td>CHATBOT</td></tr>
+<tr><td>4</td><td><code>CAP-CHATBOT-WIDGET-CONFIG</code></td><td>Configuración del widget desde el panel</td><td>CHATBOT</td></tr>
+<tr><td>5</td><td><code>CAP-KB-LIFECYCLE</code></td><td>CRUD de KnowledgeBases + ops genéricas de Sources</td><td>KB</td></tr>
+<tr><td>6</td><td><code>CAP-KB-DOC-SOURCES</code></td><td>Fuentes documentales: upload local + cloud + chunk + embed</td><td>KB</td></tr>
+<tr><td>7</td><td><code>CAP-KB-DB-SOURCES</code></td><td>Fuentes SQL: conectar + introspeccionar</td><td>KB</td></tr>
+<tr><td>8</td><td><code>CAP-CHAT-AGENT-LOOP</code></td><td>Orquestación del loop agéntico</td><td>CHAT</td></tr>
+<tr><td>9</td><td><code>CAP-CHAT-DOC-RETRIEVAL</code></td><td>Recuperación documental (tool del loop)</td><td>CHAT</td></tr>
+<tr><td>10</td><td><code>CAP-CHAT-SQL-EXECUTION</code></td><td>Ejecución segura de SQL (tool del loop)</td><td>CHAT</td></tr>
+<tr><td>11</td><td><code>CAP-CHAT-SESSIONS</code></td><td>Persistencia y consulta de sesiones</td><td>CHAT</td></tr>
+<tr><td>12</td><td><code>CAP-WIDGET-RUNTIME</code></td><td>Widget JS embebible + endpoint público</td><td>WIDGET</td></tr>
+<tr><td>13</td><td><code>CAP-EVAL-RAGAS</code></td><td>Evaluación RAGAS por CLI</td><td>EVAL</td></tr>
+<tr><td>14</td><td><code>CAP-INFRA-TENANT-ISOLATION</code></td><td>Aislamiento multi-tenant</td><td>INFRA</td></tr>
+<tr><td>15</td><td><code>CAP-INFRA-ASYNC-JOBS</code></td><td>Jobs asíncronos + polling</td><td>INFRA</td></tr>
+<tr><td>16</td><td><code>CAP-INFRA-SECRETS</code></td><td>Cifrado de secretos (Fernet)</td><td>INFRA</td></tr>
+<tr><td>17</td><td><code>CAP-INFRA-PERSISTENCE</code></td><td>Postgres + Alembic + Qdrant base</td><td>INFRA</td></tr>
+</table>
+
+<h3>Grafo de dependencias</h3>
+<pre>                    ┌─────────────────────────┐
+                    │ CAP-INFRA-PERSISTENCE   │
+                    └────────────┬────────────┘
+                                 │
+                ┌────────────────┼────────────────┐
+                │                │                │
+   ┌────────────▼─────┐ ┌────────▼─────────┐  ┌───▼───────────────┐
+   │ TENANT-ISOLATION │ │ SECRETS          │  │ ASYNC-JOBS        │
+   └────────────┬─────┘ └────┬─────────┬───┘  └───────────┬───────┘
+                │            │         │                  │
+                ▼            ▼         ▼                  │
+       ┌──────────────────────────┐                       │
+       │ AUTH-IDENTITY            │                       │
+       └────────────┬─────────────┘                       │
+                    │                                     │
+                    ▼                                     │
+       ┌──────────────────────────┐                       │
+       │ INTEG-CREDENTIALS        │                       │
+       └────┬──────────────────┬──┘                       │
+            │                  │                          │
+            ▼                  ▼                          │
+   ┌──────────────────┐  ┌──────────────────┐             │
+   │ KB-LIFECYCLE     │  │                  │             │
+   └──┬─────────┬─────┘  │                  │             │
+      │         │        │                  │             │
+      ▼         ▼        │                  │             │
+   ┌────┐    ┌────┐      │                  │             │
+   │DOC-│    │DB- │      │                  │             │
+   │SRC │    │SRC │◀─────┤(SECRETS)         │             │
+   └─┬──┘    └─┬──┘      │                  │             │
+     │         │         │                  │             │
+     │         └──(uses ASYNC-JOBS)─────────┼─────────────┘
+     │                                      │
+     ▼                                      ▼
+   ┌─────────────────────────────────────────────┐
+   │ CHATBOT-LIFECYCLE                           │
+   └──┬───────────────────────────────────────┬──┘
+      │                                       │
+      ▼                                       ▼
+   ┌──────────────────────┐         ┌──────────────────────┐
+   │ CHATBOT-WIDGET-CONFIG│         │ CHAT-SESSIONS        │
+   └──────────┬───────────┘         └──────────┬───────────┘
+              │                                │
+              │     ┌──────────────────┐       │
+              │     │ CHAT-DOC-RETRIEV │       │
+              │     └────────┬─────────┘       │
+              │              │                 │
+              │     ┌────────▼─────────┐       │
+              │     │ CHAT-SQL-EXECUT  │       │
+              │     └────────┬─────────┘       │
+              │              │                 │
+              │              ▼                 │
+              │     ┌──────────────────┐       │
+              └────▶│ CHAT-AGENT-LOOP  │◀──────┘
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┴───────────────┐
+              ▼                              ▼
+   ┌──────────────────┐         ┌──────────────────┐
+   │ WIDGET-RUNTIME   │         │ EVAL-RAGAS       │
+   └──────────────────┘         └──────────────────┘</pre>
+
+<h3>Fichas detalladas</h3>
+
+<h4>Bloque 1 — Plataforma y onboarding</h4>
+
+<div class="cap-card">
+<span class="cap-id">CAP-INFRA-PERSISTENCE</span>
+<h4>Persistencia base (Postgres + Alembic + Qdrant)</h4>
+<dl>
+<dt>Ámbito</dt><dd>Capa de almacenamiento estructurado y vectorial sobre la que se apoyan el resto de CAPs.</dd>
+<dt>Descripción</dt><dd>Provee Postgres con migraciones Alembic versionadas, conexión SQLAlchemy + patrón de repositorios, y el cluster Qdrant con creación on-demand de colecciones físicas. Incluye el <code>docker compose</code> que levanta todo el stack local (Postgres + Qdrant + Ollama + backend + frontend).</dd>
+<dt>Deps</dt><dd>—</dd>
+<dt>Use cases</dt><dd>— (transversal)</dd>
+<dt>Non-goals</dt><dd>No incluye lógica de aislamiento por tenant. No incluye seeding ni fixtures.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-INFRA-TENANT-ISOLATION</span>
+<h4>Aislamiento multi-tenant</h4>
+<dl>
+<dt>Ámbito</dt><dd>Garantiza que ninguna operación pueda leer/escribir datos fuera del tenant del usuario autenticado.</dd>
+<dt>Descripción</dt><dd><code>TenantScopingMiddleware</code> extrae <code>tenant_id</code> del JWT y lo inyecta en el request context. Todos los repositorios filtran por <code>tenant_id</code>; las colecciones Qdrant son físicamente distintas por tenant; los prefijos de storage incluyen <code>tenant_id</code>. Cualquier use case que cruce fronteras levanta <code>TenantScopeViolation</code>.</dd>
+<dt>Deps</dt><dd><code>CAP-INFRA-PERSISTENCE</code></dd>
+<dt>Use cases</dt><dd>— (transversal)</dd>
+<dt>Non-goals</dt><dd>No implementa invitaciones de miembros. No implementa roles/permisos finos dentro de un tenant.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-INFRA-SECRETS</span>
+<h4>Cifrado de secretos</h4>
+<dl>
+<dt>Ámbito</dt><dd>Persistir credenciales sensibles cifradas en BD.</dd>
+<dt>Descripción</dt><dd>Adapter <code>FernetEncryptor</code> que implementa el puerto <code>SecretEncryptor</code>. Clave maestra única por entorno (env var). Las <code>api_key</code> de <code>ProviderCredential</code> y los <code>connection_string</code> de <code>DatabaseSource</code> se cifran en escritura y se descifran solo en el momento de uso.</dd>
+<dt>Deps</dt><dd><code>CAP-INFRA-PERSISTENCE</code></dd>
+<dt>Use cases</dt><dd>— (transversal)</dd>
+<dt>Non-goals</dt><dd>No incluye rotación de claves, HSM, ni KMS externo (post-MVP).</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-INFRA-ASYNC-JOBS</span>
+<h4>Jobs asíncronos con polling</h4>
+<dl>
+<dt>Ámbito</dt><dd>Orquestar trabajos de larga duración (ingesta de documentos) con visibilidad de estado para el frontend.</dd>
+<dt>Descripción</dt><dd>Tabla <code>ingestion_jobs</code> (<code>id, source_id, status, progress, error, timestamps</code>). El backend lanza vía <code>FastAPI BackgroundTasks</code> y actualiza el registro durante la ejecución. El frontend consulta vía polling. Sin Celery/Redis en MVP.</dd>
+<dt>Deps</dt><dd><code>CAP-INFRA-PERSISTENCE</code>, <code>CAP-INFRA-TENANT-ISOLATION</code></dd>
+<dt>Use cases</dt><dd>— (transversal — consumido por <code>IngestSource</code>, <code>ReindexSource</code>)</dd>
+<dt>Non-goals</dt><dd>No incluye reintentos automáticos, colas distribuidas ni cancelación de jobs en vuelo.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-AUTH-IDENTITY</span>
+<h4>Identidad, sesión y bootstrap de tenant</h4>
+<dl>
+<dt>Ámbito</dt><dd>Alta de cuenta, login y emisión/validación de sesión JWT.</dd>
+<dt>Descripción</dt><dd>Registro con email+password (bcrypt) o Google OAuth (vía NextAuth en cliente, re-verificación del <code>id_token</code> en backend). Al registrarse ejecuta <code>BootstrapTenant</code>: crea Tenant + <code>ProviderCredential</code> Ollama default (<code>config_source=SERVER_ENV</code>; las colecciones Qdrant se crean on-demand cuando se crea la primera KB). Login emite JWT 24h sin revocación en BD. Logout en cliente (borra token).</dd>
+<dt>Deps</dt><dd><code>CAP-INFRA-PERSISTENCE</code>, <code>CAP-INFRA-TENANT-ISOLATION</code>, <code>CAP-INFRA-SECRETS</code></dd>
+<dt>Use cases</dt><dd>RegisterUser, LoginUser, LoginWithGoogle, BootstrapTenant</dd>
+<dt>Non-goals</dt><dd>No incluye recovery de password, MFA, ni invitaciones (post-MVP). No incluye revocación de JWT.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-INTEG-CREDENTIALS</span>
+<h4>Credenciales de proveedores LLM/embedding</h4>
+<dl>
+<dt>Ámbito</dt><dd>CRUD de API keys de los proveedores <code>TENANT_CREDENTIAL</code> (OpenAI, OpenAI-compat) por tenant.</dd>
+<dt>Descripción</dt><dd>Persistir <code>ProviderCredential</code> (<code>provider_id, label, api_key_encrypted, base_url?</code>). <code>TestCredential</code> valida la key contra el proveedor invocando un modelo de prueba. El catálogo de proveedores vive en código (<code>domain/catalog/llm_providers.py</code>); este flujo solo aplica a <code>TENANT_CREDENTIAL</code>.</dd>
+<dt>Deps</dt><dd><code>CAP-INFRA-SECRETS</code>, <code>CAP-INFRA-TENANT-ISOLATION</code></dd>
+<dt>Use cases</dt><dd>UpsertProviderCredential, ListCredentials, DeleteCredential, TestCredential</dd>
+<dt>Non-goals</dt><dd>No incluye gestión del catálogo en runtime. No incluye credenciales de fuentes SQL (eso vive en <code>CAP-KB-DB-SOURCES</code>).</dd>
+</dl>
+</div>
+
+<h4>Bloque 2 — Definición del chatbot</h4>
+
+<div class="cap-card">
+<span class="cap-id">CAP-KB-LIFECYCLE</span>
+<h4>Ciclo de vida de KnowledgeBases + ops genéricas de Sources</h4>
+<dl>
+<dt>Ámbito</dt><dd>CRUD de KBs a nivel tenant + ops polimórficas sobre Sources (listar, desadjuntar, probar conexión pre-attach).</dd>
+<dt>Descripción</dt><dd>Una KB es contenedor a nivel tenant que agrupa N <code>DocumentSource</code> + N <code>DatabaseSource</code>. Crear KB fija <code>chunking_config</code> y <code>embedding_selection</code>; cambiarlas dispara reindex en cascada de todos los DocumentSource de la KB y la UI advierte. <code>DeleteKnowledgeBase</code> bloquea si algún chatbot referencia la KB (<code>KnowledgeBaseInUseError</code>). <code>TestSourceConnection</code> se invoca pre-attach y no persiste.</dd>
+<dt>Deps</dt><dd><code>CAP-INFRA-PERSISTENCE</code>, <code>CAP-INFRA-TENANT-ISOLATION</code>, <code>CAP-INTEG-CREDENTIALS</code></dd>
+<dt>Use cases</dt><dd>CreateKnowledgeBase, UpdateKnowledgeBase, ListKnowledgeBases, GetKnowledgeBase, DeleteKnowledgeBase, ListSources, DetachSource, TestSourceConnection</dd>
+<dt>Non-goals</dt><dd>No incluye la ingesta documental ni la introspección SQL. No incluye la selección de KBs desde un chatbot.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-KB-DOC-SOURCES</span>
+<h4>Fuentes documentales en KB</h4>
+<dl>
+<dt>Ámbito</dt><dd>Adjuntar archivos o referencias a carpetas cloud a una KB y procesarlos vía pipeline async (chunk → embed → store).</dd>
+<dt>Descripción</dt><dd><code>AttachDocumentSource</code> registra el source. <code>IngestSource</code> lanza el pipeline: loader (pdf/docx/txt/csv/md/xlsx) → chunker → embedding provider → insertar en Qdrant del tenant filtrando por <code>kb_id</code>. <code>ReindexSource</code> re-ejecuta; idempotente.</dd>
+<dt>Deps</dt><dd><code>CAP-KB-LIFECYCLE</code>, <code>CAP-INFRA-ASYNC-JOBS</code>, <code>CAP-INTEG-CREDENTIALS</code></dd>
+<dt>Use cases</dt><dd>AttachDocumentSource, IngestSource, ReindexSource</dd>
+<dt>Non-goals</dt><dd>No incluye configuración runtime del chunker/loader. No incluye webhook de cambios en cloud (sync manual). No soporta Dropbox.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-KB-DB-SOURCES</span>
+<h4>Fuentes SQL en KB</h4>
+<dl>
+<dt>Ámbito</dt><dd>Conectar a una BD SQL read-only del cliente y persistir el snapshot de schema usable por el loop agéntico.</dd>
+<dt>Descripción</dt><dd><code>AttachDatabaseSource</code> registra la conexión (driver postgres|mysql, credential cifrada, params). <code>IntrospectDatabaseSource</code> es síncrono: produce un <code>SchemaSnapshot</code> que se persiste en la entidad. El snapshot alimenta text2SQL en runtime — no se introspecta por query.</dd>
+<dt>Deps</dt><dd><code>CAP-KB-LIFECYCLE</code>, <code>CAP-INFRA-SECRETS</code>, <code>CAP-INFRA-TENANT-ISOLATION</code></dd>
+<dt>Use cases</dt><dd>AttachDatabaseSource, IntrospectDatabaseSource</dd>
+<dt>Non-goals</dt><dd>No incluye guards SQL de runtime. No incluye introspección incremental ni detección automática de cambios de schema.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-CHATBOT-LIFECYCLE</span>
+<h4>CRUD de chatbots con wizard single-POST</h4>
+<dl>
+<dt>Ámbito</dt><dd>Crear, listar, ver, editar y borrar chatbots; adjuntar KBs y mantener su <code>PipelineConfig</code> de runtime.</dd>
+<dt>Descripción</dt><dd><code>CreateChatbot</code> ejecuta un único POST al cerrar el wizard (sin draft en BD): identidad + <code>llm_selection</code> + KBs adjuntas (N:M) + <code>PipelineConfig</code> + widget config inicial. Valida que todas las KBs adjuntas comparten <code>embedding_selection</code> (<code>IncompatibleEmbeddingsError</code>); la UI filtra opciones. <code>DeleteChatbot</code> cascada acotada: sesiones + mensajes; no toca KBs.</dd>
+<dt>Deps</dt><dd><code>CAP-KB-LIFECYCLE</code>, <code>CAP-INTEG-CREDENTIALS</code></dd>
+<dt>Use cases</dt><dd>CreateChatbot, UpdateChatbot, ListChatbots, GetChatbot, DeleteChatbot</dd>
+<dt>Non-goals</dt><dd>No incluye runtime de chat. No persiste estado intermedio del wizard. No permite cambiar <code>embedding_selection</code> de una KB adjunta.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-CHATBOT-WIDGET-CONFIG</span>
+<h4>Configuración del widget desde el panel</h4>
+<dl>
+<dt>Ámbito</dt><dd>Personalización visual + comportamiento + dominios CORS del widget asociado a un chatbot.</dd>
+<dt>Descripción</dt><dd><code>UpdateWidgetConfig</code> persiste config visual (colores, fuentes, posición, avatar, saludo) + lista de dominios CORS. <code>GetPublicWidgetConfig</code> devuelve subset no-sensible. UI ofrece preview en vivo + snippet HTML copiable.</dd>
+<dt>Deps</dt><dd><code>CAP-CHATBOT-LIFECYCLE</code></dd>
+<dt>Use cases</dt><dd>UpdateWidgetConfig, GetPublicWidgetConfig</dd>
+<dt>Non-goals</dt><dd>No incluye la entrega/runtime del widget JS. No incluye autenticación de usuarios finales.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-WIDGET-RUNTIME</span>
+<h4>Widget JS embebible + endpoint público de chat</h4>
+<dl>
+<dt>Ámbito</dt><dd>Bundle JS auto-servido + API pública que consume el widget para chatear desde la web del cliente final.</dd>
+<dt>Descripción</dt><dd>Bundle JS (<code>widget/</code>) cargado vía <code>&lt;script src=".../widget.js" data-chatbot-id="..."&gt;</code>. En boot consume <code>GetPublicWidgetConfig</code> y monta UI aislada en Shadow DOM. Endpoint público <code>/api/public/chatbots/{id}/chat</code> envuelve <code>AnswerQuery</code> con CORS estricto y sesión anónima por cookie.</dd>
+<dt>Deps</dt><dd><code>CAP-CHATBOT-WIDGET-CONFIG</code>, <code>CAP-CHAT-AGENT-LOOP</code>, <code>CAP-INFRA-TENANT-ISOLATION</code></dd>
+<dt>Use cases</dt><dd>— (envuelve AnswerQuery + GetPublicWidgetConfig vía endpoint público)</dd>
+<dt>Non-goals</dt><dd>No soporta widgets custom. No incluye telemetría avanzada en cliente. No incluye sesiones cross-device.</dd>
+</dl>
+</div>
+
+<h4>Bloque 3 — Runtime y evaluación</h4>
+
+<div class="cap-card">
+<span class="cap-id">CAP-CHAT-DOC-RETRIEVAL</span>
+<h4>Recuperación documental (tool del loop)</h4>
+<dl>
+<dt>Ámbito</dt><dd>Embed de la query + búsqueda vectorial filtrada por KBs + reranker opt-in.</dd>
+<dt>Descripción</dt><dd><code>RetrieveDocs(kb_ids, query, top_k, threshold)</code> embed la query con el <code>embedding_selection</code> común (validado upstream), vector search en la colección Qdrant del tenant filtrando por <code>kb_ids</code>, devuelve <code>list[RetrievedChunk]</code>. Si <code>enable_reranker=true</code> recoge <code>reranker_initial_top_k</code> (default 30) y aplica el puerto <code>Reranker</code>.</dd>
+<dt>Deps</dt><dd><code>CAP-KB-LIFECYCLE</code>, <code>CAP-INTEG-CREDENTIALS</code>, <code>CAP-INFRA-PERSISTENCE</code>, <code>CAP-INFRA-TENANT-ISOLATION</code></dd>
+<dt>Use cases</dt><dd>RetrieveDocs</dd>
+<dt>Non-goals</dt><dd>No incluye re-embedding al vuelo (eso es <code>ReindexSource</code>). No mezcla resultados de KBs con embeddings distintos. No incluye hybrid search BM25+vector.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-CHAT-SQL-EXECUTION</span>
+<h4>Ejecución segura de SQL en runtime (tool del loop)</h4>
+<dl>
+<dt>Ámbito</dt><dd>Generar SQL desde lenguaje natural sobre un <code>DatabaseSource</code> introspeccionado y ejecutarlo con guards.</dd>
+<dt>Descripción</dt><dd><code>ExecuteSQL(database_source_id, nl_query)</code> carga el <code>SchemaSnapshot</code> persistido, prompt-engineering text2SQL, ejecuta el SQL con 3 capas de guards: (1) <code>sqlglot_ast</code> (solo SELECT, no cross-DB); (2) <code>llm_semantic</code> (revisa intención maliciosa); (3) límites duros (<code>max_rows</code>, timeout). El router elige UN solo <code>DatabaseSource</code> por turno.</dd>
+<dt>Deps</dt><dd><code>CAP-KB-DB-SOURCES</code>, <code>CAP-INTEG-CREDENTIALS</code>, <code>CAP-INFRA-SECRETS</code>, <code>CAP-INFRA-TENANT-ISOLATION</code></dd>
+<dt>Use cases</dt><dd>ExecuteSQL</dd>
+<dt>Non-goals</dt><dd>No soporta DML/DDL. No incluye merge de resultados de múltiples DatabaseSource en un turno. No incluye paginación/streaming.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-CHAT-SESSIONS</span>
+<h4>Persistencia y consulta de sesiones multi-turno</h4>
+<dl>
+<dt>Ámbito</dt><dd>Almacenar conversaciones (sesiones + mensajes) y exponerlas al panel y al runtime.</dd>
+<dt>Descripción</dt><dd>Cada <code>ChatSession</code> tiene <code>session_id</code> persistido (cookie en widget, JWT en playground) y agrupa <code>ChatMessage[]</code> con <code>role</code>, contenido, citas y <code>metadata.iterations[]</code>. <code>ListSessions</code> y <code>GetSession</code> alimentan la vista "Conversaciones". El runtime lee historia previa para contexto multi-turno.</dd>
+<dt>Deps</dt><dd><code>CAP-INFRA-PERSISTENCE</code>, <code>CAP-INFRA-TENANT-ISOLATION</code>, <code>CAP-CHATBOT-LIFECYCLE</code></dd>
+<dt>Use cases</dt><dd>ListSessions, GetSession</dd>
+<dt>Non-goals</dt><dd>No incluye export, búsqueda full-text, ni anotaciones manuales.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-CHAT-AGENT-LOOP</span>
+<h4>Orquestación del loop agéntico</h4>
+<dl>
+<dt>Ámbito</dt><dd>Coordinar las decisiones del LLM sobre qué tool invocar hasta cerrar con <code>final_answer</code> o <code>abstain</code>.</dd>
+<dt>Descripción</dt><dd><code>AnswerQuery</code> ejecuta un agent loop con <code>max_retrieval_iterations</code> (1-5, default 3). En cada turno consulta al Router (LLM con function calling). Si <code>agentic_mode=false</code> fuerza iteración lineal. Si se alcanza el tope sin <code>final_answer</code>, cierra honestamente. Persiste <code>RetrievalIteration[]</code> en <code>ChatMessage.metadata</code>.</dd>
+<dt>Deps</dt><dd><code>CAP-CHAT-DOC-RETRIEVAL</code>, <code>CAP-CHAT-SQL-EXECUTION</code>, <code>CAP-CHAT-SESSIONS</code>, <code>CAP-INTEG-CREDENTIALS</code></dd>
+<dt>Use cases</dt><dd>AnswerQuery</dd>
+<dt>Non-goals</dt><dd>No implementa la búsqueda ni la ejecución SQL. No incluye streaming. No soporta tools custom por chatbot.</dd>
+</dl>
+</div>
+
+<div class="cap-card">
+<span class="cap-id">CAP-EVAL-RAGAS</span>
+<h4>Evaluación RAGAS por CLI (academic mode)</h4>
+<dl>
+<dt>Ámbito</dt><dd>Pipeline offline de evaluación de calidad del RAG sobre datasets controlados.</dd>
+<dt>Descripción</dt><dd><code>RunRagasEvaluation</code> invocado por CLI. Lee dataset JSONL con <code>question + ground_truth + scenario</code>, ejecuta <code>AnswerQuery</code> contra el chatbot para cada question, calcula métricas RAGAS (<code>faithfulness, answer_relevance, context_precision, context_recall</code>) usando LLM-as-judge, emite un <code>EvaluationReport</code> en disco.</dd>
+<dt>Deps</dt><dd><code>CAP-CHAT-AGENT-LOOP</code>, <code>CAP-CHATBOT-LIFECYCLE</code>, <code>CAP-INTEG-CREDENTIALS</code></dd>
+<dt>Use cases</dt><dd>RunRagasEvaluation</dd>
+<dt>Non-goals</dt><dd>No es continuo. No incluye dashboard. No incluye generación automática del dataset.</dd>
+</dl>
+</div>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s8">
+<h2><span class="num">§8</span>API REST</h2>
+
+<h3>Convenciones</h3>
+<ul>
+  <li>Base URL: <code>/api</code></li>
+  <li>Auth: JWT en header <code>Authorization: Bearer &lt;token&gt;</code> excepto <code>/api/auth/*</code> y <code>/api/public/*</code>.</li>
+  <li>Tenant scoping: automático vía middleware. Nunca se pasa <code>tenant_id</code> en URL ni body.</li>
+  <li>Content-Type: <code>application/json</code> (uploads: <code>multipart/form-data</code>).</li>
+  <li>Paginación: <code>?page=N&amp;page_size=M</code> (default 20, max 100); respuesta <code>{items, page, page_size, total}</code>.</li>
+  <li>IDs: UUIDv7.</li>
+  <li>Errores: <code>{error: {code, message, details?}}</code> + status HTTP. Códigos: 400 Validation, 401 Unauthenticated, 403 TenantScopeViolation, 404 NotFound, 409 Conflict (incl. <code>KnowledgeBaseInUse</code>, <code>IncompatibleEmbeddings</code>), 422 Semantic, 429 RateLimited, 500 Internal.</li>
+  <li>Timestamps: ISO-8601 UTC.</li>
+</ul>
+
+<h3>Endpoints por capability</h3>
+
+<h4>CAP-AUTH-IDENTITY</h4>
+<table>
+<tr><th>Método</th><th>Path</th><th>Body / resp</th></tr>
+<tr><td>POST</td><td><code>/api/auth/register</code></td><td>body <code>{email, password}</code> → <code>{user, tenant, token}</code> (BootstrapTenant ejecutado)</td></tr>
+<tr><td>POST</td><td><code>/api/auth/login</code></td><td>body <code>{email, password}</code> → <code>{user, tenant, token}</code></td></tr>
+<tr><td>POST</td><td><code>/api/auth/login/google</code></td><td>body <code>{google_id_token}</code> → <code>{user, tenant, token}</code> (crea cuenta si no existe)</td></tr>
+<tr><td>GET</td><td><code>/api/me</code></td><td>→ <code>{user, tenant}</code></td></tr>
+</table>
+<p class="note">Logout: 100% cliente (borra token local + cookie NextAuth). JWT no se revoca server-side en MVP (TTL 24h aceptado como compromiso).</p>
+
+<h4>CAP-INTEG-CREDENTIALS (+ catálogo)</h4>
+<table>
+<tr><th>Método</th><th>Path</th><th>Body / resp</th></tr>
+<tr><td>GET</td><td><code>/api/providers/llm</code></td><td>→ <code>list[LLMProviderDescriptor]</code></td></tr>
+<tr><td>GET</td><td><code>/api/providers/embedding</code></td><td>→ <code>list[EmbeddingProviderDescriptor]</code></td></tr>
+<tr><td>GET</td><td><code>/api/credentials</code></td><td>→ <code>list[ProviderCredentialView]</code> (sin <code>api_key</code>)</td></tr>
+<tr><td>POST</td><td><code>/api/credentials</code></td><td>body <code>{provider_id, label, api_key, base_url?}</code> → <code>ProviderCredentialView</code></td></tr>
+<tr><td>DELETE</td><td><code>/api/credentials/{id}</code></td><td>→ 204</td></tr>
+<tr><td>POST</td><td><code>/api/credentials/{id}/test</code></td><td>body <code>{model_id}</code> → <code>{ok, latency_ms, error?}</code></td></tr>
+</table>
+
+<h4>CAP-KB-LIFECYCLE + DOC + DB</h4>
+<table>
+<tr><th>Método</th><th>Path</th><th>Body / resp</th></tr>
+<tr><td>GET</td><td><code>/api/knowledge-bases</code></td><td>→ <code>page[KB]</code></td></tr>
+<tr><td>POST</td><td><code>/api/knowledge-bases</code></td><td>body <code>{name, description?, chunking_config, embedding_selection}</code> → <code>KB</code></td></tr>
+<tr><td>GET</td><td><code>/api/knowledge-bases/{kb_id}</code></td><td>→ <code>KB + sources[]</code></td></tr>
+<tr><td>PATCH</td><td><code>/api/knowledge-bases/{kb_id}</code></td><td>body parcial; si cambia chunking/embedding → 200 con <code>{kb, reindex_jobs: [IngestionJob]}</code></td></tr>
+<tr><td>DELETE</td><td><code>/api/knowledge-bases/{kb_id}</code></td><td>→ 204; 409 <code>KnowledgeBaseInUseError</code> si referenciada</td></tr>
+<tr><td>GET</td><td><code>/api/knowledge-bases/{kb_id}/sources</code></td><td>→ <code>list[Source]</code> (polimórfico)</td></tr>
+<tr><td>POST</td><td><code>/api/knowledge-bases/{kb_id}/sources/documents</code></td><td>multipart upload o body <code>{cloud_folder_ref}</code> → <code>DocumentSource</code></td></tr>
+<tr><td>POST</td><td><code>/api/knowledge-bases/{kb_id}/sources/databases</code></td><td>body <code>{driver, credential_id, params}</code> → <code>DatabaseSource</code></td></tr>
+<tr><td>POST</td><td><code>/api/knowledge-bases/{kb_id}/sources/test-connection</code></td><td>body <code>{spec}</code> → <code>{ok, error?}</code> (no persiste)</td></tr>
+<tr><td>POST</td><td><code>/api/sources/{source_id}/ingest</code></td><td>→ <code>IngestionJob</code></td></tr>
+<tr><td>POST</td><td><code>/api/sources/{source_id}/reindex</code></td><td>→ <code>IngestionJob</code></td></tr>
+<tr><td>POST</td><td><code>/api/sources/{source_id}/introspect</code></td><td>→ <code>SchemaSnapshot</code> (síncrono)</td></tr>
+<tr><td>DELETE</td><td><code>/api/sources/{source_id}</code></td><td>→ 204</td></tr>
+<tr><td>GET</td><td><code>/api/ingestion-jobs/{job_id}</code></td><td>→ <code>IngestionJob</code></td></tr>
+</table>
+
+<h4>CAP-CHATBOT-LIFECYCLE</h4>
+<table>
+<tr><th>Método</th><th>Path</th><th>Body / resp</th></tr>
+<tr><td>GET</td><td><code>/api/chatbots</code></td><td>→ <code>page[ChatbotSummary]</code></td></tr>
+<tr><td>POST</td><td><code>/api/chatbots</code></td><td>body <code>{name, description?, system_prompt, llm_selection, kb_ids: [], pipeline_config, widget_config}</code> → <code>Chatbot</code>; 409 <code>IncompatibleEmbeddingsError</code> si las KBs no comparten <code>embedding_selection</code></td></tr>
+<tr><td>GET</td><td><code>/api/chatbots/{chatbot_id}</code></td><td>→ <code>Chatbot + kbs[]</code></td></tr>
+<tr><td>PATCH</td><td><code>/api/chatbots/{chatbot_id}</code></td><td>→ <code>Chatbot</code></td></tr>
+<tr><td>DELETE</td><td><code>/api/chatbots/{chatbot_id}</code></td><td>→ 204 (cascada sesiones + mensajes)</td></tr>
+<tr><td>PATCH</td><td><code>/api/chatbots/{chatbot_id}/widget-config</code></td><td>body <code>WidgetConfig</code> → <code>Chatbot</code></td></tr>
+</table>
+
+<h4>CAP-CHAT-AGENT-LOOP (playground autenticado) + SESSIONS</h4>
+<table>
+<tr><th>Método</th><th>Path</th><th>Body / resp</th></tr>
+<tr><td>POST</td><td><code>/api/chatbots/{chatbot_id}/chat</code></td><td>body <code>{session_id?, message}</code> → <strong>SSE stream</strong> con eventos del loop (ver §3-H). Último evento <code>final_answer</code> contiene <code>{session_id, message: {id, role, content, citations[], iterations[]}}</code>. Header <code>Content-Type: text/event-stream</code>.</td></tr>
+<tr><td>GET</td><td><code>/api/chatbots/{chatbot_id}/sessions</code></td><td>→ <code>page[SessionSummary]</code></td></tr>
+<tr><td>GET</td><td><code>/api/sessions/{session_id}</code></td><td>→ <code>ChatSession + messages</code></td></tr>
+</table>
+
+<h4>CAP-WIDGET-RUNTIME (público, sin JWT, con CORS)</h4>
+<table>
+<tr><th>Método</th><th>Path</th><th>Body / resp</th></tr>
+<tr><td>GET</td><td><code>/api/public/chatbots/{chatbot_id}/widget-config</code></td><td>→ <code>PublicWidgetConfigDTO</code> (subset no-sensible)</td></tr>
+<tr><td>POST</td><td><code>/api/public/chatbots/{chatbot_id}/chat</code></td><td>body <code>{session_id?, message}</code> → <strong>SSE stream</strong> con eventos del loop. El evento <code>final_answer</code> contiene <code>{session_id, message: {id, role, content, citations[]}}</code> (sin <code>iterations[]</code> en el público — telemetría no se expone). Cookie HttpOnly para <code>session_id</code> si no pasada; CORS estricto a <code>allowed_domains</code>.</td></tr>
+</table>
+
+<p class="note"><strong>Sobre SSE y proxies:</strong> el servidor envía <code>X-Accel-Buffering: no</code> y <code>Cache-Control: no-cache</code> para evitar buffering en proxies (Caddy/nginx). Heartbeats cada 15s (<code>: keepalive</code>) para mantener la conexión viva. Si el cliente cierra la conexión a mitad del loop, el backend completa la iteración en curso, persiste el <code>ChatMessage</code> parcial si ya hubo iteraciones, y libera recursos.</p>
+
+<h4>CAP-EVAL-RAGAS</h4>
+<p>No expone endpoints HTTP. CLI:</p>
+<pre>python -m backend.cli eval-ragas \
+       --chatbot-id &lt;uuid&gt; --dataset &lt;path&gt; --scenario &lt;name&gt;</pre>
+
+<h3>Política de rate-limiting</h3>
+<ul>
+  <li><code>/api/auth/login</code> y <code>/api/auth/register</code>: 10 req/min/IP.</li>
+  <li><code>/api/public/chat</code>: 60 req/min/(chatbot_id, IP).</li>
+  <li>Resto autenticado: 600 req/min/tenant.</li>
+</ul>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s9">
+<h2><span class="num">§9</span>Modelo de datos</h2>
+
+<h3>Postgres — esquema</h3>
+<p>Convenciones globales: PK siempre <code>UUIDv7 id</code>; <code>created_at</code>/<code>updated_at</code> UTC en todas; <code>ON DELETE</code> según se indica por FK.</p>
+
+<h4>users</h4>
+<pre>id PK
+email UNIQUE NOT NULL
+password_hash NULL  (bcrypt; NULL si Google-only)
+google_sub UNIQUE NULL
+tenant_id FK→tenants.id ON DELETE CASCADE
+created_at, updated_at
+índices: email (UNIQUE), google_sub (UNIQUE), tenant_id</pre>
+
+<h4>tenants</h4>
+<pre>id PK
+name TEXT
+qdrant_collection_prefix TEXT UNIQUE NOT NULL  (e.g. "kb_chunks__&lt;tenant_id&gt;")
+storage_prefix TEXT UNIQUE NOT NULL     (e.g. "tenant_&lt;id&gt;/")
+created_at
+
+NOTA: el nombre real de la colección Qdrant para una KB se deriva como
+`{qdrant_collection_prefix}__{dim}` — una colección física por
+(tenant, dim). Se crea on-demand al crear la primera KB con un dim
+nuevo en ese tenant.</pre>
+
+<h4>provider_credentials</h4>
+<pre>id PK
+tenant_id FK→tenants.id ON DELETE CASCADE
+provider_id TEXT NOT NULL    (clave del catálogo)
+label TEXT NOT NULL
+api_key_encrypted BYTEA NOT NULL
+base_url TEXT NULL
+config_source TEXT NOT NULL CHECK IN ('SERVER_ENV','TENANT_CREDENTIAL')
+índices: (tenant_id, provider_id, label) UNIQUE</pre>
+
+<h4>knowledge_bases</h4>
+<pre>id PK
+tenant_id FK→tenants.id ON DELETE CASCADE
+name TEXT NOT NULL
+description TEXT
+chunking_config JSONB NOT NULL
+embedding_selection JSONB NOT NULL    (incl. `dim` y `model_id`)
+CHECK (embedding_selection ? 'dim' AND embedding_selection ? 'model_id')
+índices: tenant_id, (tenant_id, name) UNIQUE</pre>
+
+<h4>sources (polimórfica)</h4>
+<pre>id PK
+kb_id FK→knowledge_bases.id ON DELETE CASCADE
+type TEXT NOT NULL CHECK IN ('document','database')
+payload JSONB NOT NULL
+   /* document: { kind: 'upload'|'cloud',
+                  storage_uri|cloud_folder_ref,
+                  filename, mime_type, size_bytes, cloud_provider? } */
+   /* database: { driver: 'postgres'|'mysql',
+                  credential_id (cifrado en source_db_credentials),
+                  host, port, db_name, ssl_mode, schema_snapshot? } */
+ingest_status TEXT NOT NULL CHECK IN
+  ('not_started','queued','running','done','failed')
+last_ingest_at TIMESTAMPTZ NULL
+error TEXT NULL
+índices: kb_id, (kb_id, type)</pre>
+
+<h4>source_db_credentials</h4>
+<pre>id PK
+source_id FK→sources.id ON DELETE CASCADE UNIQUE
+connection_string_encrypted BYTEA NOT NULL</pre>
+
+<h4>chatbots</h4>
+<pre>id PK
+tenant_id FK→tenants.id ON DELETE CASCADE
+name TEXT NOT NULL
+description TEXT
+system_prompt TEXT NOT NULL
+llm_selection JSONB NOT NULL
+router_llm_selection JSONB NULL
+pipeline_config JSONB NOT NULL
+widget_config JSONB NOT NULL
+CHECK ((pipeline_config-&gt;&gt;'max_retrieval_iterations')::int BETWEEN 1 AND 5)
+índices: tenant_id, (tenant_id, name) UNIQUE</pre>
+
+<h4>chatbot_knowledge_base (N:M)</h4>
+<pre>chatbot_id FK→chatbots.id ON DELETE CASCADE
+kb_id FK→knowledge_bases.id ON DELETE RESTRICT
+PRIMARY KEY (chatbot_id, kb_id)</pre>
+<p class="note"><code>ON DELETE RESTRICT</code> en <code>kb_id</code> implementa el <code>KnowledgeBaseInUseError</code> a nivel BD (defensa en profundidad).</p>
+
+<h4>chat_sessions</h4>
+<pre>id PK
+chatbot_id FK→chatbots.id ON DELETE CASCADE
+tenant_id (denormalizado, defensa en profundidad)
+origin TEXT NOT NULL CHECK IN ('playground','widget')
+public_session_cookie TEXT NULL  (NULL si origin=playground)
+created_at, last_activity_at
+índices: chatbot_id, public_session_cookie</pre>
+
+<h4>chat_messages</h4>
+<pre>id PK
+session_id FK→chat_sessions.id ON DELETE CASCADE
+role TEXT NOT NULL CHECK IN ('user','assistant','system')
+content TEXT NOT NULL
+citations JSONB    (list of {source_id, source_name, location, chunk_id, score})
+metadata JSONB     ({iterations: list[RetrievalIteration]})
+created_at
+índices: (session_id, created_at)</pre>
+
+<h4>ingestion_jobs</h4>
+<pre>id PK
+source_id FK→sources.id ON DELETE CASCADE
+tenant_id (denormalizado)
+status TEXT NOT NULL CHECK IN ('queued','running','done','failed')
+progress INT NOT NULL CHECK BETWEEN 0 AND 100
+error TEXT NULL
+started_at, finished_at NULL
+índices: source_id, tenant_id, status</pre>
+
+<h3>Qdrant — colecciones</h3>
+<p><strong>Una colección física por <code>(tenant, dim)</code></strong>: <code>kb_chunks__&lt;tenant_id&gt;__&lt;dim&gt;</code> (p. ej. <code>kb_chunks__a1b2c3...__1024</code>). Vector size = <code>dim</code> del embedding model. Distance: cosine. Las colecciones se crean on-demand al crear la primera KB con un <code>dim</code> nuevo en el tenant.</p>
+
+<p>Las KBs adjuntas a un mismo chatbot siguen obligadas a compartir <code>embedding_selection</code> (regla validada upstream con <code>IncompatibleEmbeddingsError</code>). Esto garantiza que el <code>search</code> de un chatbot vive en una sola colección por <code>dim</code> y los <code>kb_ids</code> permitidos están todos en ella.</p>
+
+<p><strong>Payload por punto:</strong></p>
+<pre>{
+  tenant_id: uuid,      (filtro mandatorio en TODO query — defensa en
+                         profundidad pese a tener colección por tenant)
+  kb_id: uuid,          (filtro por kb_id en search)
+  source_id: uuid,
+  chunk_index: int,
+  content: string,      (texto del chunk — única copia)
+  metadata: { page_number?, section?, source_filename?, ... }
+}</pre>
+
+<p><strong>Filtro default en search:</strong></p>
+<pre>// Resolver colección: dim = chatbot.kb_ids[0].embedding_selection.dim
+collection = f"kb_chunks__{ctx.tenant_id}__{dim}"
+must = [
+  { key: 'tenant_id', value: ctx.tenant_id },
+  { key: 'kb_id', values: chatbot.kb_ids }
+]</pre>
+
+<p><strong>Borrado de tenant:</strong> al borrar un tenant se enumeran todas las colecciones que matchean el prefijo <code>kb_chunks__&lt;tenant_id&gt;__*</code> y se borran en cascada.</p>
+
+<h3>Invariantes de integridad</h3>
+<ul>
+  <li>Todo SELECT/UPDATE filtra por <code>tenant_id</code> (vía repository pattern; los repos solo aceptan <code>ctx</code> con <code>tenant_id</code> validado).</li>
+  <li><code>sources.type='database'</code> ⇒ <code>payload-&gt;&gt;'driver' IN ('postgres','mysql')</code>.</li>
+  <li><code>sources.type='document'</code> ⇒ <code>payload-&gt;&gt;'kind' IN ('upload','cloud')</code>.</li>
+  <li>Borrar una KB con FK <code>RESTRICT</code> en <code>chatbot_knowledge_base.kb_id</code> falla → se traduce a <code>KnowledgeBaseInUseError</code>.</li>
+</ul>
+
+<h3>Migraciones</h3>
+<p>Alembic. Una migración por feature/proposal. Reversibles. Cero migraciones manuales en datos productivos.</p>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s10">
+<h2><span class="num">§10</span>Panel (sitemap + UX)</h2>
+
+<h3>Stack frontend</h3>
+<p><strong>Next.js (App Router) + TypeScript + NextAuth + TanStack Query + Tailwind + shadcn/ui</strong>. Validación con react-hook-form + zod. NextAuth se encarga de Google OAuth y de la sesión cliente; el JWT del backend se almacena en la sesión NextAuth (cookie HttpOnly Secure) y se envía como <code>Authorization: Bearer</code> en las llamadas a la API.</p>
+<p>Razones: alineación con la memoria del TFM (que menciona Next.js como stack); NextAuth simplifica drasticamente el OAuth + la sesión; shadcn/ui sigue dando los componentes accesibles. SSR no se usa intensivamente pero está disponible.</p>
+
+<h3>Sitemap</h3>
+<pre>/login                       Login (email+pw o Google)
+/register                    Registro
+/                            Dashboard (lista de chatbots)
+/chatbots/new                Wizard (multi-step cliente, 1 POST final)
+/chatbots/:id                Detalle chatbot
+  ├ Resumen                    estado, KBs adjuntas, llm_selection, pipeline_config
+  ├ Playground                 chat de prueba + debug toggle (iterations[])
+  ├ Conversaciones             sesiones reales del widget, paginadas
+  ├ Widget                     config visual + preview en vivo + snippet
+  │                            copiable + allowed_domains
+  └ Configuración              edit (mismo formulario que el wizard)
+/knowledge                   Lista de KnowledgeBases del tenant
+/knowledge/new               Crear KB (formulario simple)
+/knowledge/:id               Detalle KB
+  ├ Resumen                    config indexación (chunking + embedding)
+  ├ Documentos                 tabla DocumentSource + estado job + Reindex/Detach
+  ├ Bases de datos             tabla DatabaseSource + schema preview + Re-introspect/Detach
+  └ Chatbots conectados        read-only (saber a quién afecta cambios)
+/settings
+  ├ Cuenta                     email, cambiar password
+  ├ Integraciones              list/upsert/delete de ProviderCredential + test
+  └ Tenant                     nombre tenant (read-only en MVP)
+
+Endpoint público (no parte del panel):
+/widget.js                   bundle del widget</pre>
+
+<h3>Wireframes textuales clave</h3>
+
+<h4>Dashboard (/)</h4>
+<p>Header: logo + nav (Chatbots | Knowledge | Settings) + avatar/menú. Cuerpo: card grande "Crea tu primer chatbot" si vacío + tabla con cards [nombre, estado, #KBs, #sesiones últimos 7d, fecha]. CTA principal: botón "+ Nuevo chatbot".</p>
+
+<h4>Wizard (/chatbots/new)</h4>
+<p>Stepper horizontal de 7 pasos:</p>
+<ol>
+  <li><strong>Identidad</strong> — nombre, descripción, system prompt + plantillas opcionales (PromptTemplate).</li>
+  <li><strong>Cerebro</strong> — LLMProvider + credential + model_id (filtra catálogo por <code>TENANT_CREDENTIAL</code> que tenga credenciales).</li>
+  <li><strong>Conocimiento</strong> — multi-select de KBs existentes con badge de <code>embedding_model</code>; el selector filtra opciones compatibles tras la primera selección.</li>
+  <li><strong>Pipeline</strong> — modo Simple (preset) / Avanzado (todos los campos de <code>PipelineConfig</code>: top_k, threshold, agentic_mode, max_iterations, reranker, abstain).</li>
+  <li><strong>Widget</strong> — config visual + preview en vivo (renderiza el bundle real con props).</li>
+  <li><strong>Revisión</strong> — resumen completo.</li>
+  <li><strong>Crear</strong> — un solo POST → redirect a <code>/chatbots/:id</code>.</li>
+</ol>
+<p>No persiste estado intermedio (cliente puro).</p>
+
+<h4>Detalle chatbot — tab Playground</h4>
+<p>Layout 2-col: chat (izq) + panel debug (der, toggle). Mientras la respuesta se está generando, el chat muestra una "burbuja activa" con el estado del agente en vivo (consumiendo el SSE): "Buscando en documentos…", "Consultando base de datos…", "Pensando…", "Generando respuesta…". Cada cambio viene del evento SSE correspondiente. Cuando llega <code>final_answer</code>, la burbuja se materializa con el mensaje. El panel debug muestra la lista completa de <code>iterations[]</code> con tool, args, resultado, latencia. Citas en burbujas del bot son clickables (modal con chunk + fuente).</p>
+
+<h4>Detalle KB — tab Documentos</h4>
+<p>Botón "+ Añadir documento" → modal con tabs (Upload / Cloud folder). Tabla: filename, tipo, tamaño, estado ingesta (pill coloreada), última ingesta, acciones (Reindex / Detach). Polling cada 2s mientras algún job esté <code>running</code>.</p>
+
+<h3>Estados de formulario</h3>
+<p>Validación inline con react-hook-form + zod. Loading states con skeleton placeholders. Error boundaries por ruta. Toast notifications para acciones (creación, borrado, errores).</p>
+
+<h3>Accesibilidad</h3>
+<p>WAI-ARIA en componentes interactivos (shadcn lo provee). Focus management en modales. Contrast ratio AA. Navegación por teclado completa en el wizard.</p>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s11">
+<h2><span class="num">§11</span>Widget embebible</h2>
+
+<h3>Arquitectura</h3>
+<p>Bundle JS separado (<code>widget/</code>) con <strong>Preact + signals + Tailwind con prefijo <code>tfm-</code></strong>. Tree-shaken. Objetivo de tamaño: &lt;100 KB gzipped. Distribuido como activo estático servido por el backend en <code>/widget.js</code> (sin CDN externo en MVP).</p>
+
+<h3>Integración por el cliente final</h3>
+<pre>&lt;script async
+        src="https://&lt;backend-domain&gt;/widget.js"
+        data-chatbot-id="&lt;chatbot_uuid&gt;"
+        data-position="bottom-right"&gt;&lt;/script&gt;</pre>
+<p>Atributos <code>data-*</code> opcionales: <code>position</code>, <code>theme-override</code>, <code>auto-open</code>, <code>greeting-override</code>. Override del cliente prevalece sobre la config del panel (sin tocar BD).</p>
+
+<h3>Ciclo de vida del bundle</h3>
+<ol>
+  <li>Lee <code>data-chatbot-id</code>.</li>
+  <li><code>GET /api/public/chatbots/{id}/widget-config</code> → recibe colores, fuente, posición, avatar, greeting, allowed_domains.</li>
+  <li>Comprueba <code>window.location.origin</code> contra <code>allowed_domains</code>. Si no coincide, no monta nada y emite warning a console.</li>
+  <li>Inyecta container con <strong>Shadow DOM cerrado</strong> y monta UI (Preact). Aísla CSS host del widget.</li>
+  <li>Sesión: lee/escribe cookie <code>tfm_widget_session_&lt;chatbot_id&gt;</code> (HttpOnly first-party desde el backend en primera respuesta).</li>
+  <li>UI: floating button → click abre panel (resizable en desktop, fullscreen en móvil &lt; 640px).</li>
+</ol>
+
+<h3>Envío de mensajes</h3>
+<p><code>POST /api/public/chatbots/{id}/chat</code> con <code>{session_id?, message}</code>. El servidor responde con <strong>SSE stream</strong> (<code>text/event-stream</code>). El widget consume los eventos del loop agéntico (ver §3-H) y muestra una "burbuja activa" con el estado:</p>
+<ul>
+  <li><code>iteration_start</code> → cambia copy "Pensando (paso N)…"</li>
+  <li><code>tool_call: search_docs</code> → "Buscando en documentos…"</li>
+  <li><code>tool_call: query_database</code> → "Consultando base de datos…"</li>
+  <li><code>tool_result</code> → "Procesando resultados…"</li>
+  <li><code>generating</code> → "Escribiendo respuesta…"</li>
+  <li><code>final_answer</code> → materializa la burbuja del bot con el mensaje + citas</li>
+  <li><code>abstain</code> → mensaje cordial de "no puedo responder eso"</li>
+  <li><code>error</code> → "Algo salió mal, inténtalo de nuevo" + retry button</li>
+</ul>
+<p>Si la conexión SSE se corta, el widget reintenta automáticamente la próxima vez que el usuario envíe un mensaje (no resume el stream interrumpido).</p>
+
+<h3>Citas en el widget</h3>
+<p>Burbujas del bot pueden incluir links a fuentes públicas (<code>filename</code> para documentos, <code>table_name</code> para SQL). Click abre tooltip con preview del chunk. URLs internas (signed URLs a storage) no se exponen al widget público.</p>
+
+<h3>Privacidad y telemetría</h3>
+<p>Sin telemetría en cliente en MVP. Sin reCAPTCHA. Sin scripts de tracking. La cookie de sesión es first-party (mismo dominio que el backend). El aviso de cookies queda a cargo del cliente final (out of scope).</p>
+
+<h3>Event bus para el host (declarado, no implementado completo en MVP)</h3>
+<pre>window.TFMChatbot = {
+  open(),
+  close(),
+  sendMessage(msg)    // declarado en spec; no implementado en MVP
+}</pre>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s12">
+<h2><span class="num">§12</span>Seguridad y multi-tenancy</h2>
+
+<h3>Modelo de amenazas</h3>
+<p><strong>Activos:</strong> datos del tenant (documentos, snapshots de BD, conversaciones); credenciales de proveedores (cifradas); credenciales de BDs SQL del cliente; JWTs de sesión.</p>
+<p><strong>Atacantes considerados:</strong> usuario autenticado que intenta cruzar tenants; visitante anónimo del widget público; atacante con XSS en la web del cliente final que aloja el widget; operador interno con acceso a BD.</p>
+
+<h3>Defensa en profundidad (7 capas)</h3>
+
+<h4>Capa 1 — Network / Edge</h4>
+<ul>
+  <li>HTTPS recomendado en cualquier deploy expuesto. <strong>En el MVP local del TFM</strong> (docker-compose) el stack corre en HTTP plano; la dependencia de HTTPS queda como nota para producción.</li>
+  <li>CORS estricto: panel solo desde origen del frontend Next.js; widget público desde <code>allowed_domains</code> del chatbot.</li>
+  <li>Rate limiting: IP-based en login/register, chatbot-based en chat público (ver §8).</li>
+</ul>
+
+<h4>Capa 2 — AuthN</h4>
+<ul>
+  <li>JWT firmado HS256 con secreto rotable (<code>JWT_SECRET</code> en <code>.env</code>). Migración a RS256 planeada post-MVP.</li>
+  <li>Expiración <strong>24h</strong>. Sin refresh tokens en MVP — el cliente re-login al expirar. NextAuth gestiona la sesión cliente y refresca la cookie cuando el backend emite un nuevo JWT.</li>
+  <li>Google OAuth vía NextAuth + <code>google-auth</code> en backend para re-verificar el <code>id_token</code> antes de emitir el JWT propio.</li>
+</ul>
+
+<h4>Capa 3 — AuthZ + tenancy</h4>
+<ul>
+  <li><code>TenantScopingMiddleware</code> extrae <code>tenant_id</code> del JWT y lo inyecta en <code>RequestContext</code>.</li>
+  <li>TODOS los repositorios reciben <code>ctx</code> y filtran por <code>ctx.tenant_id</code>; nunca aceptan <code>tenant_id</code> del request body.</li>
+  <li>Cualquier intento de acceso a recurso con tenant distinto → <code>TenantScopeViolation</code> (403).</li>
+  <li><strong>Tests de mutación obligatorios</strong> por endpoint que intentan tenant_B leyendo datos de tenant_A.</li>
+  <li>Qdrant: colección física por <code>(tenant, dim)</code> (no solo filtro lógico). Filtros adicionales por <code>kb_id</code> y <code>tenant_id</code> en payload.</li>
+  <li>Storage: prefix <code>tenant_&lt;id&gt;/...</code> por convención + ACL si se usa S3.</li>
+</ul>
+
+<h4>Capa 4 — Secrets at rest</h4>
+<ul>
+  <li>Fernet (AES-128-GCM + HMAC) con clave maestra de 32 bytes en env var <code>FERNET_KEY</code>.</li>
+  <li>Cifrados: <code>provider_credentials.api_key</code>, <code>provider_credentials.base_url</code> (opcional), <code>source_db_credentials.connection_string</code>.</li>
+  <li>Rotación de clave maestra: post-MVP (procedimiento documentado).</li>
+</ul>
+
+<h4>Capa 5 — SQL execution safety</h4>
+<p>Triple guard en <code>ExecuteSQL</code>:</p>
+<ol>
+  <li><strong>sqlglot AST</strong>: solo <code>SELECT</code>, sin cross-DB JOIN, sin acceso a <code>pg_catalog</code>/<code>information_schema</code> (configurable por driver).</li>
+  <li><strong>LLM semántico</strong>: revisa prompt + SQL generado contra patrones sensibles (SSN, passwords, salarios, …). Modelo barato (<code>router_llm_selection</code> si está definido).</li>
+  <li><strong>Límites duros</strong>: <code>max_rows=500</code>, <code>timeout=10s</code>, <code>max_cost</code> cuando soportado por driver.</li>
+</ol>
+<p>Conexión SQL: usuario read-only obligatorio, validado en <code>AttachDatabaseSource</code> intentando un <code>INSERT</code> que debe fallar.</p>
+
+<h4>Capa 6 — Input validation</h4>
+<ul>
+  <li>Pydantic en cada request body.</li>
+  <li>Tamaño máximo de upload: 50 MB por archivo, 10 archivos por multipart request.</li>
+  <li>System prompt: max 4 KB.</li>
+</ul>
+
+<h4>Capa 7 — Output filtering</h4>
+<ul>
+  <li>Markdown rendering en panel con sanitización (<code>rehype-sanitize</code>) para evitar XSS en citas.</li>
+  <li>Widget renderiza texto plano por defecto; markdown opt-in con el mismo sanitizer.</li>
+  <li>CSP headers estrictos en el panel.</li>
+</ul>
+
+<h3>Logging y audit</h3>
+<ul>
+  <li><code>structlog</code> en JSON. Campos: <code>timestamp, level, tenant_id, user_id, chatbot_id?, action, latency_ms, status</code>.</li>
+  <li>PII redaction en logs (email, api_keys) por filtros del logger.</li>
+  <li>Retención: 30 días en disco (rotación), 1 año en archivo comprimido (planificado).</li>
+</ul>
+
+<h3>Dependencias de seguridad críticas</h3>
+<p><code>bcrypt</code> (cost 12), <code>cryptography</code> (Fernet), <code>python-jose</code> o <code>pyjwt</code>, <code>google-auth</code>, <code>sqlglot</code>.</p>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s13">
+<h2><span class="num">§13</span>Evaluación (RAGAS)</h2>
+
+<h3>Objetivo</h3>
+<p>Comparar variantes del sistema (con/sin reranker, distintos chunk sizes, distintos LLMs) sobre datasets controlados para sustentar las afirmaciones cuantitativas de la memoria del TFM.</p>
+
+<h3>Framework</h3>
+<p><a href="https://docs.ragas.io">RAGAS</a>. Métricas en MVP:</p>
+<table>
+<tr><th>Métrica</th><th>Qué mide</th></tr>
+<tr><td><code>faithfulness</code></td><td>¿La respuesta solo afirma lo que aparece en el contexto recuperado?</td></tr>
+<tr><td><code>answer_relevance</code></td><td>¿La respuesta aborda la pregunta?</td></tr>
+<tr><td><code>context_precision</code></td><td>¿El contexto recuperado es pertinente?</td></tr>
+<tr><td><code>context_recall</code></td><td>¿Se recuperó el contexto necesario para responder?</td></tr>
+</table>
+<p>LLM-as-judge: usa el modelo del chatbot evaluado por defecto, o un override <code>--judge-model</code>.</p>
+
+<h3>Dataset</h3>
+<p><strong>Estrategia:</strong> primer intento es <em>reutilizar un dataset público</em> que encaje (e.g. RAG-12000, MS MARCO QA, FiQA para finanzas, o un subset filtrado de SQuAD). Si ninguno encaja, se construye uno propio en M6 a partir de los PDFs académicos y la BD demo (chinook).</p>
+
+<p>Formato JSONL, una línea por ejemplo:</p>
+<pre>{ "question": "...",
+  "ground_truth": "...",
+  "scenario": "doc_only" | "sql_only" | "mixed" | "abstain",
+  "metadata": { "difficulty": "easy"|"medium"|"hard",
+                "source_dataset": "public:rag-12000" | "tfm:custom" } }</pre>
+<p>La preferencia es dataset público para reducir trabajo manual; el campo <code>source_dataset</code> permite mezclar ambos en el mismo experimento si hace falta.</p>
+
+<h3>Pipeline de ejecución</h3>
+<ol>
+  <li>CLI lee <code>dataset_path</code>.</li>
+  <li>Para cada question: <code>POST /api/chatbots/{id}/chat</code> con sesión efímera (flag <code>--no-persist</code> que no escribe en <code>chat_sessions</code>).</li>
+  <li>Recolecta <code>{question, answer, contexts, ground_truth}</code>.</li>
+  <li>RAGAS computa métricas en batch.</li>
+  <li>Output:
+    <ul>
+      <li><code>report.json</code> con métricas agregadas y por ejemplo.</li>
+      <li><code>report.md</code> con tabla resumen + top-3 fallos por métrica.</li>
+    </ul>
+  </li>
+</ol>
+
+<h3>Escenarios del TFM</h3>
+<table>
+<tr><th>Scenario</th><th>Configuración</th><th>Preguntas</th></tr>
+<tr><td><code>doc_only</code></td><td>KB con ~20 PDFs académicos</td><td>Sobre contenido textual</td></tr>
+<tr><td><code>sql_only</code></td><td>KB con BD demo (chinook)</td><td>Analíticas</td></tr>
+<tr><td><code>mixed</code></td><td>KB con PDFs + chinook</td><td>Requieren ambos</td></tr>
+<tr><td><code>abstain</code></td><td>Preguntas fuera de dominio</td><td>Métrica: % de abstención correctas</td></tr>
+</table>
+
+<h3>Variables a comparar (matriz de evaluación)</h3>
+<ul>
+  <li>reranker on/off</li>
+  <li>agentic_mode true/false</li>
+  <li><code>max_retrieval_iterations</code> ∈ {1, 3, 5}</li>
+  <li><code>chunk_size</code> ∈ {256, 512, 1024}</li>
+  <li>LLM ∈ {<code>ollama:llama3</code>, <code>openai:gpt-4o-mini</code>}</li>
+</ul>
+
+<h3>Reproducibilidad</h3>
+<p>Seed fijo (temperatura 0 en LLM-as-judge). Versiones de modelo grabadas en el report. <code>Dockerfile.eval</code> con dependencias congeladas.</p>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s14">
+<h2><span class="num">§14</span>Roadmap por funcionalidad (sin estimaciones temporales)</h2>
+
+<p>Hitos <strong>end-to-end demo-ables</strong>, no por capa técnica. <strong>No se incluyen estimaciones de tiempo</strong> — el ritmo de implementación con agentes de programación varía mucho. El roadmap define <em>orden de prioridad y dependencias</em>, no fechas.</p>
+
+<h3>Prioridades del TFM (de mayor a menor)</h3>
+<table>
+<tr><th>Prioridad</th><th>Hitos</th><th>Razón</th></tr>
+<tr><td><strong>Esencial</strong> (núcleo del TFM)</td><td>M1, M2, M3, M4</td><td>Demuestra arquitectura hexagonal, multi-tenant, RAG documental, RAG con SQL y loop agéntico — el corazón funcional de la memoria.</td></tr>
+<tr><td><strong>Crítico para evaluación académica</strong></td><td>M6 (RAGAS)</td><td>La memoria del TFM requiere métricas cuantitativas RAGAS. Sin esto, la defensa pierde su parte empírica.</td></tr>
+<tr><td><strong>Visible / valor de producto</strong></td><td>M5 (widget)</td><td>Cierra el journey "del docker up al chat embebido" — el ángulo "spec ejecutable end-to-end".</td></tr>
+<tr><td><strong>Pulido (opcional)</strong></td><td>M7</td><td>Hardening, docs, perfiles docker. Solo si queda tiempo tras lo demás.</td></tr>
+</table>
+
+<p><strong>Orden de implementación recomendado:</strong> M1 → M2 → M3 → M4 → M6 → M5 → M7. Adelantar M6 antes que M5 permite medir el sistema en cuanto haya runtime (M4), independientemente del widget.</p>
+
+<h3>M1 — Plataforma viva</h3>
+<p><strong>Demo:</strong> <code>docker-compose up</code> arranca todo (Postgres + Qdrant + Ollama + backend + frontend Next.js). El usuario se registra, login (NextAuth con email+pw o Google), ve el panel vacío con sus settings.</p>
+<ul>
+  <li>CAP-INFRA-PERSISTENCE, CAP-INFRA-TENANT-ISOLATION, CAP-INFRA-SECRETS</li>
+  <li>CAP-AUTH-IDENTITY (BootstrapTenant crea ProviderCredential Ollama default)</li>
+  <li>CAP-INTEG-CREDENTIALS (UI/CRUD)</li>
+  <li>Frontend Next.js: <code>/login</code>, <code>/register</code>, <code>/</code> (dashboard vacío), <code>/settings/integraciones</code></li>
+  <li>docker-compose con Ollama service + seed script que pre-pulla <code>llama3.1</code> y <code>bge-m3</code> al primer arranque</li>
+</ul>
+
+<h3>M2 — KnowledgeBases con documentos</h3>
+<p><strong>Demo:</strong> usuario crea una KB con embedding Ollama, sube 3 PDFs, los ve indexados con polling.</p>
+<ul>
+  <li>CAP-INFRA-ASYNC-JOBS</li>
+  <li>CAP-KB-LIFECYCLE</li>
+  <li>CAP-KB-DOC-SOURCES (upload local + chunker fixed_size + Qdrant)</li>
+  <li>Frontend <code>/knowledge</code>, <code>/knowledge/new</code>, <code>/knowledge/:id</code> (tabs Resumen + Documentos)</li>
+</ul>
+<p>Sin cloud_storage todavía; sin DatabaseSource.</p>
+
+<h3>M3 — Chatbot básico con RAG documental</h3>
+<p><strong>Demo:</strong> usuario crea un chatbot, adjunta la KB de M2, hace una pregunta en el playground y obtiene respuesta con citas.</p>
+<ul>
+  <li>CAP-CHATBOT-LIFECYCLE</li>
+  <li>CAP-CHAT-DOC-RETRIEVAL</li>
+  <li>CAP-CHAT-SESSIONS</li>
+  <li>CAP-CHAT-AGENT-LOOP (sin SQL todavía; solo tools <code>search_docs</code>/<code>final_answer</code>/<code>abstain</code>)</li>
+  <li>Frontend wizard completo + playground</li>
+</ul>
+
+<h3>M4 — Bases de datos SQL como fuente</h3>
+<p><strong>Demo:</strong> usuario añade una conexión a BD chinook, el chatbot responde a "¿cuántos clientes hay?".</p>
+<ul>
+  <li>CAP-KB-DB-SOURCES</li>
+  <li>CAP-CHAT-SQL-EXECUTION (con los 3 guards)</li>
+  <li>Loop agéntico completo (4 tools)</li>
+  <li>Cloud storage opcional (gdrive + s3) para DocumentSource</li>
+</ul>
+
+<h3>M5 — Widget embebible</h3>
+<p><strong>Demo:</strong> snippet copiable en pestaña Widget, integrado en una página HTML demo, chat funciona.</p>
+<ul>
+  <li>CAP-CHATBOT-WIDGET-CONFIG</li>
+  <li>CAP-WIDGET-RUNTIME (bundle JS + endpoint público + CORS)</li>
+  <li>Frontend pestaña Widget + preview en vivo</li>
+  <li>Pestaña Conversaciones (lectura de sesiones del widget)</li>
+</ul>
+
+<h3>M6 — Calidad: reranker + evaluación</h3>
+<p><strong>Demo:</strong> comparar métricas con/sin reranker en un dataset <code>doc_only</code>.</p>
+<ul>
+  <li>Reranker (BGE local + Cohere opcional)</li>
+  <li>CAP-EVAL-RAGAS (CLI + 4 escenarios)</li>
+  <li>Dataset de ~50 preguntas para la memoria</li>
+</ul>
+
+<h3>M7 — Pulido (opcional)</h3>
+<p><strong>Demo:</strong> docker-compose pulido listo para que el tribunal lo arranque local; screenshots para la memoria.</p>
+<ul>
+  <li>Rate limiting completo</li>
+  <li>Hardening: CSP headers, validation strict, audit log refinado</li>
+  <li>Documentación: README + OpenAPI auto-generada + guía de instalación local</li>
+  <li>docker-compose con perfiles (dev/eval); seed script de modelos Ollama</li>
+</ul>
+<p class="note">El deploy del MVP es <strong>solo local</strong>: el tribunal corre <code>docker-compose up</code>. No se prevé deploy a un servidor público para la entrega.</p>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="s15">
+<h2><span class="num">§15</span>Riesgos y mitigaciones</h2>
+
+<table>
+<tr><th>ID</th><th>Riesgo</th><th>Prob.</th><th>Impacto</th><th>Mitigación</th></tr>
+
+<tr><td>R-01</td><td>Filtración cross-tenant</td><td>Baja</td><td>Crítico</td>
+<td>Tests de mutación obligatorios por endpoint. Repository pattern estricto. Colecciones Qdrant físicas por tenant. Code review bloqueante en endpoints nuevos.</td></tr>
+
+<tr><td>R-02</td><td>SQL injection vía text2SQL</td><td>Media</td><td>Crítico</td>
+<td>3 capas de guards (AST + LLM semántico + límites). Usuario read-only obligatorio validado en attach. Tests adversariales en eval.</td></tr>
+
+<tr><td>R-03</td><td>Coste runaway por loop agéntico mal calibrado</td><td>Media</td><td>Alto</td>
+<td><code>max_retrieval_iterations</code> ≤ 5. <code>final_answer</code> priorizada en system prompt. <code>router_llm_selection</code> (modelo barato) opt-in. Monitoring de iteraciones medias en eval (alerta &gt; 2).</td></tr>
+
+<tr><td>R-04</td><td>Embedding mismatch entre KBs adjuntas a un chatbot</td><td>Alta</td><td>Alto</td>
+<td>Validación dura en <code>CreateChatbot</code> (<code>IncompatibleEmbeddingsError</code>). UI filtra opciones tras la 1ª selección. Tests de integración para el path de error.</td></tr>
+
+<tr><td>R-05</td><td>PDFs/docs malformados rompen ingesta</td><td>Alta</td><td>Medio</td>
+<td>Cada loader maneja sus excepciones y marca el source como <code>failed</code> con error legible. Frontend muestra error y permite reintento.</td></tr>
+
+<tr><td>R-06</td><td>Sesión JWT no se revoca en logout</td><td>Alta</td><td>Bajo</td>
+<td>Por diseño en MVP. TTL 24h como compromiso. Documentado como limitación conocida. Roadmap post-MVP: blacklist en Redis o refresh tokens.</td></tr>
+
+<tr><td>R-07</td><td>Calidad de retrieval insuficiente para SQL complejos</td><td>Media</td><td>Alto</td>
+<td>Non-goal explícito: no reemplazar a un analista. Sample rows en schema snapshot. Eval scenario <code>sql_only</code> con baseline conservador.</td></tr>
+
+<tr><td>R-08</td><td>Cuello de botella en Qdrant con muchos tenants</td><td>Baja</td><td>Alto</td>
+<td>Colecciones físicas por tenant facilitan sharding futuro. Monitor de tamaño por colección. Documentado para re-evaluar en producción.</td></tr>
+
+<tr><td>R-09</td><td>Dependencia de modelos cloud puede caer / cambiar API</td><td>Media</td><td>Medio</td>
+<td>Adapter pattern aísla en un archivo por proveedor. Catálogo en código permite añadir nuevos rápido. Ollama como fallback siempre disponible.</td></tr>
+
+<tr><td>R-10</td><td>Ataque XSS desde citas en el widget público</td><td>Baja</td><td>Medio</td>
+<td>Shadow DOM cerrado en widget. <code>rehype-sanitize</code> en markdown rendering. CSP headers estrictos. Tests de regresión.</td></tr>
+
+<tr><td>R-11</td><td>Confusión usuario por wizard sin draft + indexación previa</td><td>Alta</td><td>Medio</td>
+<td>Empty state en wizard sugiere crear KB primero si no hay ninguna. Mensaje claro: "Las KBs se crean en /knowledge".</td></tr>
+
+<tr><td>R-12</td><td>RAGAS LLM-as-judge da scores inestables</td><td>Media</td><td>Medio</td>
+<td>Temperatura 0 obligatoria. Múltiples runs y mediana. Documentar limitaciones de la métrica en la memoria del TFM.</td></tr>
+
+</table>
+
+</section>
+
+<!-- =============================================================== -->
+<section id="appendix">
+<h2><span class="num">§A</span>Anexos</h2>
+
+<h3>A.1 Workflow desde este HTML hasta el código</h3>
+<pre>HTML (este documento, §1–§15)
+      │
+      ▼
+Revisión del usuario + respuestas a questions-pending.md
+      │
+      ▼
+Invocar `writing-plans` skill → plan de implementación
+      │
+      ▼
+OpenSpec proposals (1 CAP → 1 proposal, ~17 proposals)
+   en orden del grafo de deps:
+     Plataforma:  PERSISTENCE → TENANT-ISOLATION → SECRETS →
+                  ASYNC-JOBS → AUTH-IDENTITY → INTEG-CREDENTIALS
+     Definición:  KB-LIFECYCLE → KB-DOC-SOURCES → KB-DB-SOURCES →
+                  CHATBOT-LIFECYCLE → CHATBOT-WIDGET-CONFIG
+     Runtime:     CHAT-DOC-RETRIEVAL → CHAT-SQL-EXECUTION →
+                  CHAT-SESSIONS → CHAT-AGENT-LOOP → WIDGET-RUNTIME
+     Evaluación:  EVAL-RAGAS
+      │
+      ▼
+Implementación TDD por proposal con AC Given/When/Then
+      │
+      ▼
+M1 → M7 (roadmap §14)</pre>
+
+<h3>A.2 Catálogo de proveedores propuesto (MVP)</h3>
+<table>
+<tr><th>provider_id</th><th>Tipo</th><th>Config source</th><th>Modelos por defecto</th></tr>
+<tr><td><code>ollama</code></td><td>LLM + Embedding</td><td>SERVER_ENV</td><td>llama3.1, mistral, gemma2 / bge-m3, nomic-embed-text, embeddinggemma:300m</td></tr>
+<tr><td><code>openai</code></td><td>LLM + Embedding</td><td>TENANT_CREDENTIAL</td><td>gpt-4o-mini, gpt-4o / text-embedding-3-small, text-embedding-3-large</td></tr>
+<tr><td><code>openai_compat</code></td><td>LLM + Embedding</td><td>TENANT_CREDENTIAL + base_url</td><td>genérico (Groq, Together, OpenRouter, DeepSeek, GitHub Models, NIM)</td></tr>
+<tr><td><code>cohere</code> (reranker)</td><td>Reranker</td><td>TENANT_CREDENTIAL</td><td>rerank-multilingual-v3.0</td></tr>
+</table>
+
+<h3>A.3 Variables de entorno requeridas</h3>
+<pre># Backend
+POSTGRES_URL=postgresql+asyncpg://user:pw@postgres:5432/tfm_rag
+QDRANT_URL=http://qdrant:6333
+QDRANT_API_KEY=(opcional)
+OLLAMA_BASE_URL=http://ollama:11434         (obligatorio — servicio en compose)
+OLLAMA_DEFAULT_LLM_MODEL=llama3.1           (modelo a pre-pullar en seed)
+OLLAMA_DEFAULT_EMBEDDING_MODEL=bge-m3
+JWT_SECRET=(32 bytes random)
+JWT_EXPIRES_HOURS=24
+FERNET_KEY=(32 bytes base64; cryptography.fernet.Fernet.generate_key())
+GOOGLE_OAUTH_CLIENT_ID=(opcional, requerido si se activa OAuth)
+GOOGLE_OAUTH_CLIENT_SECRET=(opcional)
+STORAGE_BACKEND=local | s3                  (local en MVP)
+STORAGE_LOCAL_PATH=/data/storage
+STORAGE_S3_BUCKET=(si backend=s3)
+STORAGE_S3_REGION=(si backend=s3)
+LOG_LEVEL=INFO
+RATE_LIMIT_REDIS_URL=(opcional, default in-memory)
+FRONTEND_ORIGIN=http://localhost:3000       (para CORS del panel)
+
+# Frontend (Next.js)
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=(32 bytes random)
+GOOGLE_OAUTH_CLIENT_ID=(mismo que backend)
+GOOGLE_OAUTH_CLIENT_SECRET=(mismo que backend)</pre>
+
+<h3>A.4 Referencias</h3>
+<ul>
+  <li>Memoria del TFM: <code>docs/TFM - Segunda entrega - Ade Cabo Cuartero.pdf</code> (67 páginas, fuente primaria).</li>
+  <li>Log canónico de la sesión: <code>conversation-2026-05-19.log</code>.</li>
+  <li>Handover entre sesiones: <code>handover.md</code>.</li>
+  <li>Code samples de la sesión 1 (snapshot): <code>code-samples-2026-05-19.md</code>.</li>
+  <li>Preguntas pendientes: <code>questions-pending.md</code>.</li>
+  <li>RAGAS: <a href="https://docs.ragas.io">docs.ragas.io</a>.</li>
+  <li>Qdrant: <a href="https://qdrant.tech/documentation/">qdrant.tech/documentation</a>.</li>
+  <li>OpenSpec: framework de proposals para implementación incremental (fase post-spec).</li>
+</ul>
+
+</section>
+</main>
+</div>
+</body>
+</html>

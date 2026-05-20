@@ -17,7 +17,7 @@ async def test_alembic_baseline_marks_db(settings: Settings) -> None:
     result = await asyncio.to_thread(
         subprocess.run,
         ["alembic", "upgrade", "head"],
-        cwd="backend",
+        cwd=".",
         capture_output=True,
         text=True,
         check=False,

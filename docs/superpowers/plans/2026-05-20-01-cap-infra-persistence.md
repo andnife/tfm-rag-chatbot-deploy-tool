@@ -747,7 +747,7 @@ async def test_alembic_baseline_marks_db(settings: Settings) -> None:
     # Run migrations up to head
     result = subprocess.run(
         ["alembic", "upgrade", "head"],
-        cwd="backend",
+        cwd=".",
         capture_output=True,
         text=True,
         check=False,

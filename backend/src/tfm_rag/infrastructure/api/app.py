@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from tfm_rag.infrastructure.api.middleware.tenant_scoping import (
     TenantScopingMiddleware,
 )
-from tfm_rag.infrastructure.api.routers import auth, health
+from tfm_rag.infrastructure.api.routers import auth, credentials, health
 from tfm_rag.infrastructure.settings import get_settings
 
 
@@ -16,6 +16,7 @@ def create_app() -> FastAPI:
     app.add_middleware(TenantScopingMiddleware, settings=settings)
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(credentials.router)
     return app
 
 

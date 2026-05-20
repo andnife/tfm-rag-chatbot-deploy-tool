@@ -9,7 +9,6 @@ from tfm_rag.domain.errors.common import (
 from tfm_rag.infrastructure.persistence.models.tenants import TenantRow
 from tfm_rag.infrastructure.persistence.repository import (
     BaseRepository,
-    RequestContext,
 )
 
 
@@ -21,14 +20,14 @@ class TenantRepository(BaseRepository[TenantRow]):
     """
     model = TenantRow
 
-    def _check_tenant(self, row: object) -> None:  # type: ignore[override]
+    def _check_tenant(self, row: object) -> None:
         row_id = getattr(row, "id", None)
         if row_id != self._ctx.tenant_id:
             raise TenantScopeViolationError(
                 f"TenantRow id {row_id} != context tenant {self._ctx.tenant_id}"
             )
 
-    async def get(self, row_id: UUID) -> TenantRow:  # type: ignore[override]
+    async def get(self, row_id: UUID) -> TenantRow:
         if row_id != self._ctx.tenant_id:
             raise NotFoundError(f"TenantRow({row_id}) not found in tenant")
         stmt = select(TenantRow).where(TenantRow.id == row_id)

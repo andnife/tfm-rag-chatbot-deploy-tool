@@ -9,10 +9,10 @@ from tfm_rag.infrastructure.persistence.base import Base
 
 # Import all ORM model modules so Base.metadata sees them for autogenerate
 from tfm_rag.infrastructure.persistence.models import (
+    provider_credentials,  # noqa: F401
     tenants,  # noqa: F401
     users,  # noqa: F401
 )
-from tfm_rag.infrastructure.persistence.models import provider_credentials  # noqa: F401
 from tfm_rag.infrastructure.settings import get_settings
 
 config = context.config

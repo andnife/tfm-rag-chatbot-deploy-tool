@@ -16,7 +16,6 @@ from tfm_rag.infrastructure.auth.google_oauth import GoogleOAuthVerifier
 from tfm_rag.infrastructure.auth.jwt import encode_jwt
 from tfm_rag.infrastructure.settings import Settings, get_settings
 
-
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 

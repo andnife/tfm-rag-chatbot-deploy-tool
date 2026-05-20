@@ -30,7 +30,6 @@ from tfm_rag.infrastructure.persistence.repository import RequestContext
 from tfm_rag.infrastructure.secrets.fernet_encryptor import FernetSecretEncryptor
 from tfm_rag.infrastructure.settings import Settings, get_settings
 
-
 router = APIRouter(prefix="/api", tags=["integrations"])
 
 

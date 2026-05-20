@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Literal
 
-
 ConfigSource = Literal["SERVER_ENV", "TENANT_CREDENTIAL"]
 
 

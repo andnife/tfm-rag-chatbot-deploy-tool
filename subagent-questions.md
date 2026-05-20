@@ -34,4 +34,10 @@ El usuario revisará este doc periódicamente y responderá. Las respuestas se a
 
 ## Entradas
 
-(Aún ninguna. Las irán añadiendo los subagents al ejecutar el plan.)
+### 2026-05-20 — Plan-01 / Task 2 / Step 2.1 — Spec includes unused `import os` in test file
+
+**Subagent role:** implementer (Task 2)
+**Pregunta:** El spec del test incluía `import os` que nunca se usa. Ruff con rule F401 lo rechazaría. ¿Mantenemos el import (y desactivamos F401 para ese archivo) o lo quitamos del spec?
+**Asunción aplicada:** Quitado el import (la alternativa habría dejado fallar el lint, lo cual no es aceptable).
+**Impacto si es errónea:** Bajo — solo cosmético.
+**Respuesta del usuario:** (pendiente)

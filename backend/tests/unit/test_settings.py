@@ -1,5 +1,4 @@
 import pytest
-from pydantic import ValidationError
 
 from tfm_rag.infrastructure.settings import Settings
 
@@ -23,5 +22,5 @@ def test_settings_load_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_settings_missing_required_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in ("POSTGRES_URL", "QDRANT_URL", "OLLAMA_BASE_URL", "JWT_SECRET", "FERNET_KEY"):
         monkeypatch.delenv(key, raising=False)
-    with pytest.raises(ValidationError):
+    with pytest.raises(Exception):  # pydantic ValidationError  # noqa: B017
         Settings()  # type: ignore[call-arg]

@@ -15,6 +15,7 @@ dependencies = [
     "qdrant-client>=1.12",
     "httpx>=0.28",
     "structlog>=24.4",
+    "bcrypt>=4.2",
 ]
 
 [project.optional-dependencies]

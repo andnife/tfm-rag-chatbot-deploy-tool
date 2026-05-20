@@ -1,7 +1,7 @@
 # Handover — sesión de brainstorming TFM RAG Platform
 
-**Última actualización:** 2026-05-20, sesión 4 (15 secciones CERRADAS + HTML escrito + questions-pending.md respondido + HTML actualizado con las decisiones del usuario).
-**Continuación:** invocar `writing-plans` para generar el plan de implementación; tras eso, extraer las 17 OpenSpec proposals en orden del grafo de deps.
+**Última actualización:** 2026-05-20, sesión 5 (M1 COMPLETO — 6 plans escritos e implementados; 22 unit tests passing; integration tests deferred hasta Docker).
+**Continuación:** seguir con plan #7 (CAP-KB-LIFECYCLE, primer plan de M2).
 
 Este documento es el punto de entrada para retomar el trabajo. Si lo estás leyendo en una sesión nueva: empieza aquí, no por el `.log`.
 
@@ -262,18 +262,72 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 
 ## 8. Cómo continuar en la próxima sesión
 
-15 secciones cerradas, HTML escrito y actualizado con las 10 decisiones del usuario (P-01 a P-10). **Próximo paso: invocar `writing-plans`** para generar el plan de implementación.
+### Estado actual al cierre de sesión 5
 
-1. **Saluda al usuario** y confirma que vienes de leer `handover.md`.
-2. Verifica que el HTML está al día: `docs/superpowers/specs/2026-05-19-tfm-roadmap-funcional-design.html`.
-3. Lee `questions-pending.md` para conocer las decisiones aplicadas (cabecera con resumen + cuerpo histórico con las respuestas literales).
-4. Invoca **`writing-plans`** para generar el plan de implementación. No invoques ninguna otra skill.
-5. El plan debe orquestar la extracción de las **17 OpenSpec proposals** (1 CAP → 1 proposal) en orden del grafo de deps:
-   - **Plataforma:** PERSISTENCE → TENANT-ISOLATION → SECRETS → ASYNC-JOBS → AUTH-IDENTITY → INTEG-CREDENTIALS
-   - **Definición:** KB-LIFECYCLE → KB-DOC-SOURCES → KB-DB-SOURCES → CHATBOT-LIFECYCLE → CHATBOT-WIDGET-CONFIG
-   - **Runtime:** CHAT-DOC-RETRIEVAL → CHAT-SQL-EXECUTION → CHAT-SESSIONS → CHAT-AGENT-LOOP → WIDGET-RUNTIME
-   - **Evaluación:** EVAL-RAGAS
-6. Orden de implementación recomendado por el usuario (P-01): M1 → M2 → M3 → M4 → **M6 (RAGAS)** → M5 (widget) → M7 (pulido opcional). Adelantar M6 antes de M5 permite medir el sistema en cuanto haya runtime.
+**Rama:** `feat/cap-01-infra-persistence` (todo en una rama; cuando se quiera abrir PRs por CAP se rebasarán en branches separadas).
+
+**Plans implementados (6/17):**
+| # | CAP | Tag | Estado |
+|---|---|---|---|
+| 01 | CAP-INFRA-PERSISTENCE | `cap-01-infra-persistence` | ✅ |
+| 02 | CAP-INFRA-TENANT-ISOLATION | `cap-02-infra-tenant-isolation` | ✅ |
+| 03 | CAP-INFRA-SECRETS | `cap-03-infra-secrets` | ✅ |
+| 04 | CAP-INFRA-ASYNC-JOBS | `cap-04-infra-async-jobs` | ✅ (tabla diferida a plan #7) |
+| 05 | CAP-AUTH-IDENTITY | `cap-05-auth-identity` | ✅ |
+| 06 | CAP-INTEG-CREDENTIALS | `cap-06-integ-credentials` | ✅ |
+
+**M1 COMPLETO**. Demo end-to-end posible (con Docker): `docker compose up` → register → login → ver panel vacío con Ollama default + posibilidad de añadir más providers.
+
+**Verificación al cierre:**
+- `ruff check .` ✅ All checks passed
+- `mypy src/` ✅ Success: no issues found in 62 source files
+- `pytest tests/ -m "not integration"` ✅ 22 passed (5-7 integration tests deselected — esperan Docker)
+
+**Plans pendientes (11/17):** #7 KB-LIFECYCLE → #8 KB-DOC-SOURCES → #9 KB-DB-SOURCES → #10 CHATBOT-LIFECYCLE → #11 CHATBOT-WIDGET-CONFIG → #12 CHAT-DOC-RETRIEVAL → #13 CHAT-SQL-EXECUTION → #14 CHAT-SESSIONS → #15 CHAT-AGENT-LOOP → #16 WIDGET-RUNTIME → #17 EVAL-RAGAS.
+
+### Workflow de ejecución acordado con el usuario
+
+Para minimizar interrupciones:
+- **Una sola rama** por ahora (`feat/cap-01-infra-persistence`); cuando el usuario quiera PRs separados, hacer rebase por CAP.
+- **Subagent-driven** con dispatches por batches de 2-3 tareas (haiku para tareas mecánicas, sonnet para integración).
+- **NO correr ruff/mypy/pytest dentro de subagents** — el controller hace un pase global cada ~3-4 plans (cleanup commit cuando haga falta).
+- **NO usar reviewers (spec/quality) salvo dudas serias** — son demasiado caros para el ritmo del TFM.
+- Cada subagent puede dejar dudas en `subagent-questions.md` (formato en cabecera).
+
+### Próximo paso concreto en la siguiente sesión
+
+1. Saluda y confirma que lees handover.
+2. Lee `subagent-questions.md` — varias entradas pendientes (Docker no disponible, decisión `import os`, etc.). Pregunta al usuario si quiere atenderlas antes de seguir.
+3. Escribe `docs/superpowers/plans/2026-05-20-07-cap-kb-lifecycle.md` con la plantilla de los anteriores (file structure + tasks TDD con código completo).
+4. Implementa con subagents en batches (haiku para mecánico, sonnet para integración).
+5. Tag `cap-07-kb-lifecycle` al cierre.
+
+### Pendientes / riesgos conocidos
+
+- **Docker no disponible en WSL2** — todos los integration tests están deselected (`-m "not integration"`). El usuario debe activar la integración WSL en Docker Desktop antes de validar M1 end-to-end.
+- **Tag movido tras cleanup** — `cap-06-integ-credentials` ahora apunta al cleanup commit (`6ebe672`), no al feat original (`b78299f`).
+- **Branch `feat/cap-01-infra-persistence`** acumula 6 CAPs. Cuando se quiera abrir PRs separadas, rebasear en branches por tag.
+
+### Cómo ejecutar el stack manualmente (cuando Docker esté disponible)
+
+```bash
+cd infra
+cp .env.example .env
+# Generar secretos:
+python -c "import secrets; print('JWT_SECRET=' + secrets.token_urlsafe(32))" >> .env
+python -c "from cryptography.fernet import Fernet; print('FERNET_KEY=' + Fernet.generate_key().decode())" >> .env
+docker compose up -d postgres qdrant ollama
+cd ../backend
+source .venv/bin/activate
+alembic upgrade head
+pytest tests/integration -m integration -v
+uvicorn tfm_rag.infrastructure.api.app:app --reload --port 8000
+# En otra terminal:
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"test@example.com","password":"password123"}'
+```
 
 ---
 
@@ -290,22 +344,13 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 ## 10. Estado del TaskList
 
 ```
-#1 [completed] Explorar contexto del proyecto
-#2 [completed] Hacer preguntas clarificadoras al usuario
-#3 [completed] Proponer 2-3 estructuras del documento
-#4 [completed] Presentar diseño por secciones y obtener aprobación
-               (1-15 cerradas — §7 con 17 CAPs; §8-§15 drafteadas
-                autónomamente en modo /goal)
-#5 [completed] Escribir documento HTML final
-#6 [completed] Self-review del HTML
-#7 [completed] Revisión por el usuario (HTML + questions-pending.md
-                respondido con 10 decisiones aplicadas al HTML)
-#8 [in_progress] Invocar writing-plans
-                  → Plan #1 (CAP-INFRA-PERSISTENCE) escrito en
-                    docs/superpowers/plans/2026-05-20-01-...md
-                  → Quedan 16 plans (02..17) por escribir, en orden
-                    del grafo de deps.
-#9 [pending]   Ejecutar plans (subagent-driven o inline)
+#1-#7  [completed] Diseño (15 secciones HTML + 10 preguntas
+                   respondidas + writing-plans invocado)
+#8     [in_progress] Escribir + implementar 17 plans (6/17 hechos)
+                     ✅ Plans 01-06 (M1 cerrado, todos tagged)
+                     ⏳ Plans 07-17 (M2-M7)
+#9     [pending]     Ejecutar integration tests con Docker disponible
+#10    [pending]     PR(s) — decidir si uno por CAP o uno por M
 ```
 
-Task #7 es el gate actual.
+Estado actual: en pausa para handover. La siguiente sesión arranca con plan #7.

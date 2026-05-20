@@ -2257,5 +2257,102 @@ ESTADO POST-RESPUESTAS:
 
 
 ================================================================================
+SESIÓN 5 — 2026-05-20 (implementación M1)
+================================================================================
+
+Continuación tras aprobación del HTML + respuestas a questions-pending.
+
+WORKFLOW APLICADO:
+  - Branch única: `feat/cap-01-infra-persistence` (todos los CAPs sobre la
+    misma rama por ahora; se rebaseará por CAP al abrir PRs).
+  - Subagent-driven con dispatches en batches.
+  - User feedback durante la sesión:
+      * "stop with the ruff checks" → quitar lint en cada task
+      * "los tests lo mismo, espérate a hacer todos los tests de un archivo
+        y features para comprobarlos" → no correr pytest tampoco en tasks
+      * Resultado: implementer-only por task, controller hace pase global
+        de ruff+mypy+pytest cada 3-4 plans.
+
+PLANS COMPLETADOS (6/17 — M1 cerrado):
+
+  Plan 01 — CAP-INFRA-PERSISTENCE
+    9 tareas TDD. Branch skeleton + tooling + Pydantic Settings +
+    SQLAlchemy async + Alembic baseline + RequestContext +
+    BaseRepository skeleton + QdrantStore con collection_name_for +
+    docker-compose (Postgres/Qdrant/Ollama con healthchecks) +
+    FastAPI app + /health. Tag: cap-01-infra-persistence.
+
+  Plan 02 — CAP-INFRA-TENANT-ISOLATION
+    10 tareas. User/Tenant entities + TenantScopeViolationError +
+    ORM TenantRow/UserRow + migración 0002 + tenant-aware
+    BaseRepository CRUD + JWT helpers (python-jose, HS256) +
+    TenantScopingMiddleware + dependencies + integration tests.
+    Renombrado consistente: TenantScopeViolation → TenantScopeViolationError.
+    Tag: cap-02-infra-tenant-isolation.
+
+  Plan 03 — CAP-INFRA-SECRETS
+    3 tareas. SecretEncryptor port + FernetSecretEncryptor +
+    SecretDecryptError + 4 unit tests. Tag: cap-03-infra-secrets.
+
+  Plan 04 — CAP-INFRA-ASYNC-JOBS
+    3 tareas. IngestionJob entity + IngestionStatus enum +
+    JobsRunner (BackgroundTasks wrapper) + InMemoryRunner para tests.
+    Tabla ingestion_jobs DIFERIDA a plan #7 (depende de sources).
+    Tag: cap-04-infra-async-jobs.
+
+  Plan 05 — CAP-AUTH-IDENTITY
+    6 tareas. bcrypt password hashing + auth errors + TenantRepository
+    + UsersByEmailFinder + BootstrapTenant + RegisterUser + LoginUser +
+    OAuthVerifier port + GoogleOAuthVerifier (google-auth) +
+    LoginWithGoogle + /api/auth/* routers + integration test.
+    Tag: cap-05-auth-identity.
+
+  Plan 06 — CAP-INTEG-CREDENTIALS
+    6 tareas. Provider catalog (in code: ollama/openai/openai_compat) +
+    EMBEDDING_PROVIDER_CATALOG + ProviderCredential entity + ORM +
+    migración 0003 + CRUD (upsert/list/delete/test_credential) +
+    /api/credentials + /api/providers/* routers + EXTIENDE
+    BootstrapTenant para crear Ollama default credential.
+    Tag: cap-06-integ-credentials. M1 CERRADO.
+
+CHECKPOINTS DE LINT/TIPOS/TESTS:
+
+  Tras plan #4:
+    - Issues: collection error en test_health_endpoint (settings no env),
+      9 mypy errors en middleware (Starlette type compatibility), 10 ruff
+      errors (import sorting + nombres).
+    - Cleanup commit: os.environ.setdefault en conftest.py, ASGIApp en
+      middleware signature, ruff --fix.
+    - Tras cleanup: 19 unit tests passing, mypy 36 source files clean.
+
+  Tras plan #6 (cierre de sesión):
+    - Issues: 6 ruff errors (auto-fixable, imports), 2 mypy errors
+      (unused type:ignore en tenants_repo después del cleanup anterior),
+      pytest collection error (email-validator no estaba instalado para
+      EmailStr).
+    - Cleanup commits: `cleanup after plan-06` (type:ignore + imports) +
+      `fix(deps): pin pydantic[email]`.
+    - Tag cap-06-integ-credentials movido al cleanup commit.
+    - Estado final: ruff clean, mypy 62 source files clean, 22 unit
+      tests passing.
+
+ENTRADAS NUEVAS EN subagent-questions.md:
+  - Plan-01/Task 3: Docker no disponible en WSL.
+  - Plan-01/Task 4: Docker no disponible (alembic upgrade head deferred).
+  - (Resto de plans no añadieron entradas — todos los issues eran
+    técnicos resolubles in-context.)
+
+CIERRE DE SESIÓN POR REQUEST DEL USUARIO:
+  "cuando acabes eso para y haz handover, que me tengo que ir"
+  → Cierre tras plan #6. handover.md, log y questions-pending
+    actualizados al estado actual.
+
+PRÓXIMA SESIÓN:
+  - Lee handover.md y subagent-questions.md.
+  - Resuelve pendientes en questions doc si quieres antes de seguir
+    (Docker, etc.).
+  - Sigue con plan #7 (CAP-KB-LIFECYCLE, primer plan de M2).
+
+================================================================================
 FIN DEL LOG (se actualizará al cerrar cada sección)
 ================================================================================

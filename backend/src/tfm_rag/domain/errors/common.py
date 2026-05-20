@@ -10,7 +10,7 @@ class ValidationError(DomainError):
     """Raised when input validation fails at the domain level."""
 
 
-class TenantScopeViolation(DomainError):
+class TenantScopeViolationError(DomainError):
     """Raised when a use case tries to access data from a different tenant.
 
     This should NEVER happen in correctly-written code; if it triggers,

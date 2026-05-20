@@ -1,14 +1,14 @@
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
-from typing import TypeAlias
+from collections.abc import Callable, Coroutine
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from fastapi import BackgroundTasks
 
-
 _log = logging.getLogger(__name__)
 
-JobCoroutine: TypeAlias = Callable[[], Awaitable[None]]
+type JobCoroutine = Callable[[], Coroutine[Any, Any, None]]
 
 
 class JobsRunner:
@@ -43,8 +43,16 @@ class InMemoryRunner:
 
     def schedule(self, coro: JobCoroutine) -> None:
         try:
-            asyncio.get_event_loop().run_until_complete(coro())
+            loop = asyncio.get_running_loop()
         except RuntimeError:
-            # No running loop; create one
+            loop = None
+
+        if loop is not None and loop.is_running():
+            # We're inside a running event loop (e.g. pytest-asyncio).
+            # Run the coroutine in a separate thread with its own event loop.
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(asyncio.run, coro())
+                future.result()
+        else:
             asyncio.run(coro())
         self.completed.append(coro)

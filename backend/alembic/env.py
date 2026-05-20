@@ -6,11 +6,13 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from tfm_rag.infrastructure.persistence.base import Base
-from tfm_rag.infrastructure.settings import get_settings
 
 # Import all ORM model modules so Base.metadata sees them for autogenerate
-from tfm_rag.infrastructure.persistence.models import tenants  # noqa: F401
-from tfm_rag.infrastructure.persistence.models import users  # noqa: F401
+from tfm_rag.infrastructure.persistence.models import (
+    tenants,  # noqa: F401
+    users,  # noqa: F401
+)
+from tfm_rag.infrastructure.settings import get_settings
 
 config = context.config
 if config.config_file_name is not None:

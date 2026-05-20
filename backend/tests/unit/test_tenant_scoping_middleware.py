@@ -10,7 +10,6 @@ from tfm_rag.infrastructure.api.middleware.tenant_scoping import (
 from tfm_rag.infrastructure.auth.jwt import encode_jwt
 from tfm_rag.infrastructure.settings import Settings
 
-
 SECRET = "x" * 32
 
 

@@ -3,11 +3,11 @@ from uuid import UUID
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 
 from tfm_rag.infrastructure.auth.jwt import TokenInvalidError, decode_jwt
 from tfm_rag.infrastructure.persistence.repository import RequestContext
 from tfm_rag.infrastructure.settings import Settings
-
 
 # Paths that do NOT require an authenticated context.
 UNAUTHENTICATED_PREFIXES: tuple[str, ...] = (
@@ -25,7 +25,7 @@ class TenantScopingMiddleware(BaseHTTPMiddleware):
     `request.state.ctx`. If the path is unauthenticated, sets ctx to None.
     """
 
-    def __init__(self, app: Callable[..., Awaitable[Response]], *, settings: Settings) -> None:
+    def __init__(self, app: ASGIApp, *, settings: Settings) -> None:
         super().__init__(app)
         self._settings = settings
 

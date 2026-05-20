@@ -1,7 +1,5 @@
 import asyncio
 
-import pytest
-
 from tfm_rag.infrastructure.jobs.runner import InMemoryRunner
 
 

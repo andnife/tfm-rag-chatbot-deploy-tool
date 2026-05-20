@@ -8,7 +8,6 @@ from tfm_rag.infrastructure.auth.jwt import (
     encode_jwt,
 )
 
-
 SECRET = "x" * 32
 
 

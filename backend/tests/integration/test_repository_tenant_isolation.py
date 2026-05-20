@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from tfm_rag.domain.errors.common import NotFoundError, TenantScopeViolation
+from tfm_rag.domain.errors.common import NotFoundError, TenantScopeViolationError
 from tfm_rag.infrastructure.persistence.engine import (
     build_engine,
     build_session_factory,
@@ -27,7 +27,7 @@ class TenantRepository(BaseRepository[TenantRow]):
     def _check_tenant(self, row: object) -> None:  # type: ignore[override]
         row_id = getattr(row, "id", None)
         if row_id != self._ctx.tenant_id:
-            raise TenantScopeViolation(
+            raise TenantScopeViolationError(
                 f"TenantRow id {row_id} != context tenant {self._ctx.tenant_id}"
             )
 
@@ -81,11 +81,11 @@ async def test_tenant_a_cannot_see_tenant_b(settings: Settings) -> None:
         with pytest.raises(NotFoundError):
             await repo_b_read.get(tenant_a_id)
 
-    # Tenant B tries to add a row with tenant_id of A → TenantScopeViolation
+    # Tenant B tries to add a row with tenant_id of A → TenantScopeViolationError
     async with factory() as session:
         repo_b_add = TenantRepository(session, ctx_b)
         bad_row = _tenant(tenant_a_id)
-        with pytest.raises(TenantScopeViolation):
+        with pytest.raises(TenantScopeViolationError):
             await repo_b_add.add(bad_row)
 
     await engine.dispose()

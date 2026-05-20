@@ -26,7 +26,7 @@ def encode_jwt(
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=expires_hours)).timestamp()),
     }
-    return jwt.encode(payload, secret, algorithm="HS256")
+    return jwt.encode(payload, secret, algorithm="HS256")  # type: ignore[no-any-return]
 
 
 def decode_jwt(token: str, secret: str) -> dict[str, Any]:
@@ -35,6 +35,6 @@ def decode_jwt(token: str, secret: str) -> dict[str, Any]:
     Raises TokenInvalidError on any failure (expired, bad signature, malformed).
     """
     try:
-        return jwt.decode(token, secret, algorithms=["HS256"])
+        return jwt.decode(token, secret, algorithms=["HS256"])  # type: ignore[no-any-return]
     except JWTError as exc:
         raise TokenInvalidError(str(exc)) from exc

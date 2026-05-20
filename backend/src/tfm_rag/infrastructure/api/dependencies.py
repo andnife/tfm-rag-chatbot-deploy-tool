@@ -10,7 +10,6 @@ from tfm_rag.infrastructure.persistence.engine import (
 from tfm_rag.infrastructure.persistence.repository import RequestContext
 from tfm_rag.infrastructure.settings import Settings, get_settings
 
-
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 

@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import Select, delete, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tfm_rag.domain.errors.common import NotFoundError, TenantScopeViolation
+from tfm_rag.domain.errors.common import NotFoundError, TenantScopeViolationError
 from tfm_rag.infrastructure.persistence.base import Base
 
 
@@ -33,11 +34,11 @@ class BaseRepository[E: Base]:
     def _check_tenant(self, row: object) -> None:
         row_tenant = getattr(row, "tenant_id", None)
         if row_tenant is None:
-            raise TenantScopeViolation(
+            raise TenantScopeViolationError(
                 f"{type(row).__name__} has no tenant_id; refusing to operate."
             )
         if row_tenant != self._ctx.tenant_id:
-            raise TenantScopeViolation(
+            raise TenantScopeViolationError(
                 f"Row tenant {row_tenant!s} != context tenant {self._ctx.tenant_id!s}."
             )
 
@@ -49,7 +50,7 @@ class BaseRepository[E: Base]:
         return row
 
     async def get(self, row_id: UUID) -> E:
-        stmt = select(self.model).where(
+        stmt: Select[Any] = select(self.model).where(
             self.model.id == row_id,  # type: ignore[attr-defined]
             self.model.tenant_id == self._ctx.tenant_id,  # type: ignore[attr-defined]
         )
@@ -57,10 +58,10 @@ class BaseRepository[E: Base]:
         row = result.scalar_one_or_none()
         if row is None:
             raise NotFoundError(f"{self.model.__name__}({row_id}) not found in tenant")
-        return row
+        return row  # type: ignore[no-any-return]
 
     async def list(self, *, limit: int = 20, offset: int = 0) -> list[E]:
-        stmt = (
+        stmt: Select[Any] = (
             select(self.model)
             .where(self.model.tenant_id == self._ctx.tenant_id)  # type: ignore[attr-defined]
             .limit(limit)
@@ -74,6 +75,6 @@ class BaseRepository[E: Base]:
             self.model.id == row_id,  # type: ignore[attr-defined]
             self.model.tenant_id == self._ctx.tenant_id,  # type: ignore[attr-defined]
         )
-        result = await self._session.execute(stmt)
+        result: CursorResult[Any] = await self._session.execute(stmt)  # type: ignore[assignment]
         if result.rowcount == 0:
             raise NotFoundError(f"{self.model.__name__}({row_id}) not found in tenant")

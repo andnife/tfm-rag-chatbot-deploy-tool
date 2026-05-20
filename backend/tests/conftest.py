@@ -1,5 +1,13 @@
 import os
 
+# Set env defaults BEFORE importing any tfm_rag modules so that pydantic
+# Settings validation does not fail during test collection.
+os.environ.setdefault("POSTGRES_URL", "postgresql+asyncpg://tfm:tfm@localhost:5432/tfm_rag")
+os.environ.setdefault("QDRANT_URL", "http://localhost:6333")
+os.environ.setdefault("OLLAMA_BASE_URL", "http://localhost:11434")
+os.environ.setdefault("JWT_SECRET", "x" * 32)
+os.environ.setdefault("FERNET_KEY", "X4O7zPlk-AbCdEfGhIjKlMnOpQrStUvWxYz0123456=")
+
 import pytest
 
 from tfm_rag.infrastructure.settings import Settings

@@ -12,6 +12,7 @@ from tfm_rag.infrastructure.persistence.models import (
     tenants,  # noqa: F401
     users,  # noqa: F401
 )
+from tfm_rag.infrastructure.persistence.models import provider_credentials  # noqa: F401
 from tfm_rag.infrastructure.settings import get_settings
 
 config = context.config

@@ -26,3 +26,11 @@ class SourceNotFoundError(NotFoundError):
 
 class UnsupportedSourceTypeError(DomainError):
     """Raised when a tester / handler is requested for an unknown SourceType."""
+
+
+class IngestionFailedError(DomainError):
+    """Raised when the ingestion pipeline fails for a single source."""
+
+
+class IngestionJobNotFoundError(NotFoundError):
+    """Raised when an IngestionJob row does not exist in the tenant."""

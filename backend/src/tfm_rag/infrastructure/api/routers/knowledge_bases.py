@@ -495,7 +495,7 @@ async def upload_document_(
     except ValidationError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    # Create the IngestionJob row in the same session (committed by get_session)
+    # Create the IngestionJob row in the same session
     job_id = uuid4()
     session.add(
         IngestionJobRow(
@@ -506,7 +506,9 @@ async def upload_document_(
             progress=0,
         )
     )
-    await session.flush()
+    # Commit explicitly so the background task can read the row via a new session.
+    # get_session will call commit() again on the already-clean session (no-op).
+    await session.commit()
 
     factory = _get_factory(settings)
     runner = JobsRunner(background_tasks)
@@ -562,7 +564,8 @@ async def reindex_source_(
             progress=0,
         )
     )
-    await session.flush()
+    # Commit explicitly so the background task can read the row via a new session.
+    await session.commit()
 
     factory = _get_factory(settings)
     runner = JobsRunner(background_tasks)

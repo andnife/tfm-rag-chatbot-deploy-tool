@@ -5,13 +5,13 @@ from httpx import ASGITransport, AsyncClient
 from qdrant_client import AsyncQdrantClient
 from sqlalchemy import text
 
+import tfm_rag.infrastructure.api.dependencies as _deps
 from tfm_rag.infrastructure.api.app import app
 from tfm_rag.infrastructure.persistence.engine import (
     build_engine,
     build_session_factory,
 )
 from tfm_rag.infrastructure.settings import Settings
-import tfm_rag.infrastructure.api.dependencies as _deps
 
 
 @pytest.fixture

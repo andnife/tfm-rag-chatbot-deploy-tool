@@ -6,7 +6,7 @@ from tfm_rag.infrastructure.document_loaders.txt import TxtLoader
 @pytest.mark.asyncio
 async def test_txt_loader_decodes_utf8() -> None:
     loader = TxtLoader()
-    text = await loader.load("hola, mundo — ÿ".encode("utf-8"))
+    text = await loader.load("hola, mundo — ÿ".encode())
     assert text == "hola, mundo — ÿ"
 
 

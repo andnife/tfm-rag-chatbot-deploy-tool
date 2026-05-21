@@ -1,12 +1,24 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tfm_rag.application.knowledge.attach_document_source import (
+    attach_document_source,
+)
 from tfm_rag.application.knowledge.create_knowledge_base import (
     KnowledgeBaseView,
     create_knowledge_base,
@@ -16,10 +28,15 @@ from tfm_rag.application.knowledge.delete_knowledge_base import (
 )
 from tfm_rag.application.knowledge.detach_source import detach_source
 from tfm_rag.application.knowledge.get_knowledge_base import get_knowledge_base
+from tfm_rag.application.knowledge.ingest_source import (
+    IngestionContext,
+    run_ingestion_pipeline,
+)
 from tfm_rag.application.knowledge.list_knowledge_bases import (
     list_knowledge_bases,
 )
 from tfm_rag.application.knowledge.list_sources import list_sources
+from tfm_rag.application.knowledge.reindex_source import purge_source_chunks
 from tfm_rag.application.knowledge.test_source_connection import (
     test_source_connection,
 )
@@ -35,14 +52,6 @@ from tfm_rag.domain.errors.knowledge import (
 )
 from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
-from tfm_rag.application.knowledge.attach_document_source import (
-    attach_document_source,
-)
-from tfm_rag.application.knowledge.ingest_source import (
-    IngestionContext,
-    run_ingestion_pipeline,
-)
-from tfm_rag.application.knowledge.reindex_source import purge_source_chunks
 from tfm_rag.infrastructure.api.dependencies import (
     _get_factory,  # noqa: PLC2701
     get_current_context,
@@ -418,7 +427,7 @@ async def _ingest_in_background(
                         .values(
                             status="failed",
                             error=str(exc)[:1900],
-                            finished_at=datetime.now(timezone.utc),
+                            finished_at=datetime.now(UTC),
                         )
                     )
                     await s3.execute(
@@ -434,7 +443,7 @@ async def _ingest_in_background(
 
             # Success
             async with factory() as s4:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 await s4.execute(
                     update(IngestionJobRow)
                     .where(IngestionJobRow.id == job_id)

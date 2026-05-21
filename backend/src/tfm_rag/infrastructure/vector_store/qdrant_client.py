@@ -100,9 +100,9 @@ class QdrantStore:
         if not kb_ids:
             return []
         kb_ids_str = [str(k) for k in kb_ids]
-        result = await self._client.search(
+        response = await self._client.query_points(
             collection_name=collection,
-            query_vector=query_vector,
+            query=query_vector,
             limit=top_k,
             score_threshold=score_threshold,
             query_filter=Filter(
@@ -120,7 +120,7 @@ class QdrantStore:
             with_payload=True,
         )
         out: list[tuple[str, float, dict[str, Any]]] = []
-        for hit in result:
+        for hit in response.points:
             out.append((str(hit.id), float(hit.score), dict(hit.payload or {})))
         return out
 

@@ -61,3 +61,13 @@ El usuario revisará este doc periódicamente y responderá. Las respuestas se a
 **Asunción aplicada:** Sí. En su lugar, ejecuté verificaciones estructurales sin DB: `alembic heads` (verifica que la migración es bien formada) → OK; `alembic history` (muestra cadena de migraciones) → OK; importlib check (verifica que 0001_baseline.py es importable y revision="0001") → OK. El archivo `test_alembic_baseline.py` existe y está correctamente escrito con `@pytest.mark.integration`, se deseleccionará sin Docker. La ejecución real (conexión a Postgres + upgrade + lectura de alembic_version) ocurrirá en Task 7 o Task 9.
 **Impacto si es errónea:** Bajo — la estructura de migración Alembic y la sintaxis de env.py han sido validadas sin DB. La verdadera prueba de integración con Postgres se ejecutará cuando el contenedor esté disponible. Si hay errores en los imports de env.py (Base, get_settings), se detectarían en Task 7.
 **Respuesta del usuario:** ✅ Aceptada (2026-05-21, sesión 6). Verificación real diferida a sesión 6 cuando Docker esté operativo — antes de añadir plan #7 corremos `alembic upgrade head` y los integration tests acumulados de M1.
+
+---
+
+### 2026-05-21 — Plan-07 / Task-4 / Step-4.12 — `test_source_connection` collected by pytest as a test
+
+**Subagent role:** implementer (Task 4)
+**Pregunta:** The test file (`test_knowledge_use_cases.py`) imports `test_source_connection` from the use case module. Because the name starts with `test_`, pytest collects it as an additional test item (13 collected vs expected 12), causing `1 error` for missing fixtures `spec_type`/`spec`. The plan expects exactly 12 PASSED.
+**Asunción aplicada:** Added `__test__ = False` at module level in `test_source_connection.py` (the use case file, not the test file). This is a standard pytest mechanism to suppress test collection from a non-test module. The use case logic is unchanged.
+**Impacto si es errónea:** Bajo — `__test__ = False` is purely a pytest directive and has no effect on runtime behaviour of the use case. If the plan author prefers a different fix (e.g., renaming the import in the test file), the one-liner can be removed.
+**Respuesta del usuario:** (vacío hasta que conteste)

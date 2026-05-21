@@ -72,13 +72,13 @@ async def test_search_returns_matching_chunk(_clean_state: None) -> None:
         # "about typewriters"; a query for "pineapples" should outrank the
         # typewriter chunk.
         body = (
-            "Pineapples are tropical fruit that grow on a low plant. "
-            "They are sweet and acidic. Many people enjoy pineapple slices "
-            "with ham on pizza, which is famously controversial.\n\n"
-            "Typewriters are mechanical writing machines that became popular "
-            "in offices in the late 19th and early 20th centuries. They use "
-            "a ribbon of inked fabric to imprint letters onto paper."
-        ).encode("utf-8")
+            b"Pineapples are tropical fruit that grow on a low plant. "
+            b"They are sweet and acidic. Many people enjoy pineapple slices "
+            b"with ham on pizza, which is famously controversial.\n\n"
+            b"Typewriters are mechanical writing machines that became popular "
+            b"in offices in the late 19th and early 20th centuries. They use "
+            b"a ribbon of inked fabric to imprint letters onto paper."
+        )
         upload = await client.post(
             f"/api/knowledge-bases/{kb_id}/sources/documents",
             headers=h,

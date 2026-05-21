@@ -53,10 +53,9 @@ from tfm_rag.domain.errors.knowledge import (
     KnowledgeBaseNotFoundError,
     SourceNotFoundError,
 )
-from tfm_rag.domain.value_objects.retrieved_chunk import RetrievedChunk
-from tfm_rag.infrastructure.embedders.dispatcher import EmbedderDispatcher
 from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
+from tfm_rag.domain.value_objects.retrieved_chunk import RetrievedChunk
 from tfm_rag.infrastructure.api.dependencies import (
     _get_factory,  # noqa: PLC2701
     get_current_context,
@@ -66,6 +65,7 @@ from tfm_rag.infrastructure.chunkers.fixed_size import FixedSizeChunker
 from tfm_rag.infrastructure.document_loaders.dispatcher import LoaderDispatcher
 from tfm_rag.infrastructure.document_loaders.pdf import PdfLoader
 from tfm_rag.infrastructure.document_loaders.txt import TxtLoader
+from tfm_rag.infrastructure.embedders.dispatcher import EmbedderDispatcher
 from tfm_rag.infrastructure.embedders.ollama import OllamaEmbedder
 from tfm_rag.infrastructure.jobs.runner import JobsRunner
 from tfm_rag.infrastructure.persistence.models.ingestion_jobs import (

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tfm_rag.application.chat.retrieve_docs import retrieve_docs
 from tfm_rag.application.knowledge.attach_document_source import (
     attach_document_source,
 )
@@ -44,12 +45,16 @@ from tfm_rag.application.knowledge.update_knowledge_base import (
     update_knowledge_base,
 )
 from tfm_rag.domain.entities.source import SourceType
+from tfm_rag.domain.errors.chat import UnsupportedProviderError
 from tfm_rag.domain.errors.common import ValidationError
 from tfm_rag.domain.errors.knowledge import (
+    IncompatibleEmbeddingsError,
     KnowledgeBaseInUseError,
     KnowledgeBaseNotFoundError,
     SourceNotFoundError,
 )
+from tfm_rag.domain.value_objects.retrieved_chunk import RetrievedChunk
+from tfm_rag.infrastructure.embedders.dispatcher import EmbedderDispatcher
 from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
 from tfm_rag.infrastructure.api.dependencies import (
@@ -592,3 +597,65 @@ async def reindex_source_(
     runner.schedule(_kick)
 
     return UploadDocOut(source_id=str(source_id), job_id=str(job_id))
+
+
+class SearchIn(BaseModel):
+    query: str
+    top_k: int = Field(default=5, ge=1, le=50)
+    score_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class SearchHitOut(BaseModel):
+    point_id: str
+    content: str
+    source_id: str
+    source_filename: str
+    chunk_index: int
+    score: float
+    metadata: dict[str, Any]
+
+    @classmethod
+    def from_chunk(cls, c: RetrievedChunk) -> "SearchHitOut":
+        return cls(
+            point_id=c.point_id,
+            content=c.content,
+            source_id=str(c.source_id),
+            source_filename=c.source_filename,
+            chunk_index=c.chunk_index,
+            score=c.score,
+            metadata=c.metadata,
+        )
+
+
+@router.post("/{kb_id}/search", response_model=list[SearchHitOut])
+async def search_(
+    kb_id: UUID,
+    body: SearchIn,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> list[SearchHitOut]:
+    qdrant = _qdrant(settings)
+    try:
+        chunks = await retrieve_docs(
+            session, ctx,
+            qdrant=qdrant,
+            dispatcher=EmbedderDispatcher.default(),
+            settings=settings,
+            kb_ids=[kb_id],
+            query=body.query,
+            top_k=body.top_k,
+            score_threshold=body.score_threshold,
+        )
+    except KnowledgeBaseNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except IncompatibleEmbeddingsError as exc:
+        # Cannot happen for a single kb_id, but keep the mapping for symmetry.
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except UnsupportedProviderError as exc:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc)
+        ) from exc
+    finally:
+        await qdrant.close()
+    return [SearchHitOut.from_chunk(c) for c in chunks]

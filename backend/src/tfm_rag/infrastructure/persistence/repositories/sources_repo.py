@@ -1,9 +1,9 @@
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import delete, select
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any
 
 from tfm_rag.domain.errors.knowledge import SourceNotFoundError
 from tfm_rag.infrastructure.persistence.models.sources import SourceRow

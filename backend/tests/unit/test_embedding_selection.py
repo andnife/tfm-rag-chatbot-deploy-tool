@@ -1,5 +1,6 @@
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from tfm_rag.domain.errors.common import ValidationError
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection

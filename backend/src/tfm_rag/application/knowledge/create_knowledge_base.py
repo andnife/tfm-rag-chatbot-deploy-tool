@@ -4,7 +4,6 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tfm_rag.domain.entities.knowledge_base import KnowledgeBase
 from tfm_rag.domain.errors.common import ValidationError
 from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection

@@ -7,6 +7,7 @@ from qdrant_client.models import (
     FieldCondition,
     Filter,
     FilterSelector,
+    MatchAny,
     MatchValue,
     PointStruct,
     VectorParams,
@@ -79,6 +80,49 @@ class QdrantStore:
                 )
             ),
         )
+
+    async def search(
+        self,
+        *,
+        collection: str,
+        tenant_id: UUID,
+        kb_ids: list[UUID],
+        query_vector: list[float],
+        top_k: int,
+        score_threshold: float | None = None,
+    ) -> list[tuple[str, float, dict[str, Any]]]:
+        """Run vector search filtered by tenant_id + kb_ids.
+
+        Returns a list of `(point_id, score, payload)` tuples sorted by score
+        descending. `score_threshold` is applied as a `score_threshold`
+        argument to Qdrant (server-side filter).
+        """
+        if not kb_ids:
+            return []
+        kb_ids_str = [str(k) for k in kb_ids]
+        result = await self._client.search(
+            collection_name=collection,
+            query_vector=query_vector,
+            limit=top_k,
+            score_threshold=score_threshold,
+            query_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="tenant_id",
+                        match=MatchValue(value=str(tenant_id)),
+                    ),
+                    FieldCondition(
+                        key="kb_id",
+                        match=MatchAny(any=kb_ids_str),
+                    ),
+                ]
+            ),
+            with_payload=True,
+        )
+        out: list[tuple[str, float, dict[str, Any]]] = []
+        for hit in result:
+            out.append((str(hit.id), float(hit.score), dict(hit.payload or {})))
+        return out
 
     async def health(self) -> bool:
         try:

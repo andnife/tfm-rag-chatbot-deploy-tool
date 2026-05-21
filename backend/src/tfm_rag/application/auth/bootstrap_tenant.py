@@ -38,6 +38,10 @@ async def bootstrap_tenant(
         storage_prefix=storage,
     )
     session.add(tenant)
+    # Flush tenant first so the credential's FK to tenants.id resolves.
+    # Without a relationship() declaration the UoW topological sort can
+    # emit the dependent INSERT first when both rows are added before flush.
+    await session.flush()
 
     ollama_default = ProviderCredentialRow(
         id=uuid4(),

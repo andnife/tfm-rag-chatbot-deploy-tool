@@ -40,7 +40,7 @@ El usuario revisará este doc periódicamente y responderá. Las respuestas se a
 **Pregunta:** El spec del test incluía `import os` que nunca se usa. Ruff con rule F401 lo rechazaría. ¿Mantenemos el import (y desactivamos F401 para ese archivo) o lo quitamos del spec?
 **Asunción aplicada:** Quitado el import (la alternativa habría dejado fallar el lint, lo cual no es aceptable).
 **Impacto si es errónea:** Bajo — solo cosmético.
-**Respuesta del usuario:** (pendiente)
+**Respuesta del usuario:** ✅ Aceptada (2026-05-21, sesión 6). Quitar el import es lo correcto: no compensa silenciar reglas de lint por un import muerto. Pauta para subagents futuros: si un spec contiene código que no se usa, recórtalo antes de copiarlo.
 
 ---
 
@@ -50,7 +50,7 @@ El usuario revisará este doc periódicamente y responderá. Las respuestas se a
 **Pregunta:** Docker no está disponible en este entorno WSL2 (comando no encontrado). ¿Procedo con verificación de imports y salto la ejecución del contenedor Postgres?
 **Asunción aplicada:** Saltado `docker run`. Verificé que todos los imports funcionan correctamente (`from tfm_rag.infrastructure.persistence.engine import build_engine, build_session_factory, session_scope; from tfm_rag.infrastructure.persistence.base import Base` → OK). El test está correctamente marcado con `@pytest.mark.integration` y se deselecciona cuando se filtra con `-m "not integration"`. La integración completa con Postgres será validada en Task 7 cuando docker-compose esté arriba.
 **Impacto si es errónea:** Bajo — el código está bien tipado y es importable. La verdadera prueba de conectividad (conexión a Postgres real) ocurrirá en Task 7 con docker-compose. Si hay un error en engine.py, se detectará cuando la sesión intente conectar.
-**Respuesta del usuario:** (pendiente)
+**Respuesta del usuario:** ✅ Aceptada (2026-05-21, sesión 6). El usuario está activando Docker Desktop / WSL2 ahora; los integration tests deferidos se ejecutarán en sesión 6 antes de cerrar plan #7.
 
 ---
 
@@ -60,4 +60,4 @@ El usuario revisará este doc periódicamente y responderá. Las respuestas se a
 **Pregunta:** Task 4.6 requiere ejecutar `alembic upgrade head` contra una base de datos Postgres real. Docker no está disponible en este entorno WSL2. ¿Debo diferir la ejecución completa del test a Task 7/9 cuando docker-compose esté levantado?
 **Asunción aplicada:** Sí. En su lugar, ejecuté verificaciones estructurales sin DB: `alembic heads` (verifica que la migración es bien formada) → OK; `alembic history` (muestra cadena de migraciones) → OK; importlib check (verifica que 0001_baseline.py es importable y revision="0001") → OK. El archivo `test_alembic_baseline.py` existe y está correctamente escrito con `@pytest.mark.integration`, se deseleccionará sin Docker. La ejecución real (conexión a Postgres + upgrade + lectura de alembic_version) ocurrirá en Task 7 o Task 9.
 **Impacto si es errónea:** Bajo — la estructura de migración Alembic y la sintaxis de env.py han sido validadas sin DB. La verdadera prueba de integración con Postgres se ejecutará cuando el contenedor esté disponible. Si hay errores en los imports de env.py (Base, get_settings), se detectarían en Task 7.
-**Respuesta del usuario:** (pendiente)
+**Respuesta del usuario:** ✅ Aceptada (2026-05-21, sesión 6). Verificación real diferida a sesión 6 cuando Docker esté operativo — antes de añadir plan #7 corremos `alembic upgrade head` y los integration tests acumulados de M1.

@@ -29,7 +29,9 @@ async def test_migration_0002_creates_tables(settings: Settings) -> None:
         v = (await session.execute(
             text("SELECT version_num FROM alembic_version")
         )).scalar()
-        assert v == "0002"
+        # 0002 introduces the tables; later migrations may bump the head.
+        # Verify the table side-effect, not a frozen revision number.
+        assert v is not None
         async with engine.connect() as conn:
             tables = await conn.run_sync(
                 lambda sync_conn: inspect(sync_conn).get_table_names()

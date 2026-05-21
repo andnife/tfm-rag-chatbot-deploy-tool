@@ -5,6 +5,7 @@ from tfm_rag.infrastructure.api.middleware.tenant_scoping import (
 )
 from tfm_rag.infrastructure.api.routers import (
     auth,
+    chatbots,
     credentials,
     health,
     ingestion_jobs,
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     app.include_router(credentials.router)
     app.include_router(knowledge_bases.router)
     app.include_router(ingestion_jobs.router)
+    app.include_router(chatbots.router)
     return app
 
 

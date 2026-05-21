@@ -1,0 +1,237 @@
+from typing import Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tfm_rag.application.chatbot_config.create_chatbot import (
+    ChatbotView,
+    create_chatbot,
+)
+from tfm_rag.application.chatbot_config.delete_chatbot import delete_chatbot
+from tfm_rag.application.chatbot_config.get_chatbot import get_chatbot
+from tfm_rag.application.chatbot_config.list_chatbots import list_chatbots
+from tfm_rag.application.chatbot_config.update_chatbot import update_chatbot
+from tfm_rag.domain.errors.chatbot import (
+    ChatbotAlreadyExistsError,
+    ChatbotNotFoundError,
+)
+from tfm_rag.domain.errors.common import ValidationError
+from tfm_rag.domain.errors.knowledge import (
+    IncompatibleEmbeddingsError,
+    KnowledgeBaseNotFoundError,
+)
+from tfm_rag.domain.value_objects.llm_selection import LLMSelection
+from tfm_rag.domain.value_objects.pipeline_config import (
+    GenerationConfig,
+    PipelineConfig,
+)
+from tfm_rag.infrastructure.api.dependencies import (
+    get_current_context,
+    get_session,
+)
+from tfm_rag.infrastructure.persistence.repository import RequestContext
+
+router = APIRouter(prefix="/api/chatbots", tags=["chatbots"])
+
+
+# --- Input models -----------------------------------------------------------
+
+class LLMSelectionIn(BaseModel):
+    provider_id: str
+    credential_id: UUID
+    model_id: str
+
+    def to_vo(self) -> LLMSelection:
+        return LLMSelection(
+            provider_id=self.provider_id,
+            credential_id=self.credential_id,
+            model_id=self.model_id,
+        )
+
+
+class GenerationConfigIn(BaseModel):
+    temperature: float = 0.2
+    top_p: float = 1.0
+    max_tokens: int = Field(default=1024, ge=1, le=32_000)
+
+    def to_vo(self) -> GenerationConfig:
+        return GenerationConfig(
+            temperature=self.temperature,
+            top_p=self.top_p,
+            max_tokens=self.max_tokens,
+        )
+
+
+class PipelineConfigIn(BaseModel):
+    top_k: int = Field(default=5, ge=1, le=50)
+    score_threshold: float = Field(default=0.0, ge=0.0, le=1.0)
+    agentic_mode: bool = True
+    max_retrieval_iterations: int = Field(default=3, ge=1, le=5)
+    enable_reranker: bool = False
+    reranker_initial_top_k: int = Field(default=30, ge=1, le=200)
+    abstain_when_insufficient: bool = True
+    router_llm_selection: LLMSelectionIn | None = None
+    generation: GenerationConfigIn = Field(default_factory=GenerationConfigIn)
+
+    def to_vo(self) -> PipelineConfig:
+        return PipelineConfig(
+            top_k=self.top_k,
+            score_threshold=self.score_threshold,
+            agentic_mode=self.agentic_mode,
+            max_retrieval_iterations=self.max_retrieval_iterations,
+            enable_reranker=self.enable_reranker,
+            reranker_initial_top_k=self.reranker_initial_top_k,
+            abstain_when_insufficient=self.abstain_when_insufficient,
+            router_llm_selection=(
+                self.router_llm_selection.to_vo()
+                if self.router_llm_selection
+                else None
+            ),
+            generation=self.generation.to_vo(),
+        )
+
+
+class CreateChatbotIn(BaseModel):
+    name: str
+    description: str | None = None
+    system_prompt: str
+    llm_selection: LLMSelectionIn
+    kb_ids: list[UUID] = Field(default_factory=list)
+    pipeline_config: PipelineConfigIn = Field(default_factory=PipelineConfigIn)
+    widget_config: dict[str, Any] = Field(default_factory=dict)
+
+
+class UpdateChatbotIn(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    system_prompt: str | None = None
+    llm_selection: LLMSelectionIn | None = None
+    kb_ids: list[UUID] | None = None
+    pipeline_config: PipelineConfigIn | None = None
+    widget_config: dict[str, Any] | None = None
+
+
+# --- Output models ----------------------------------------------------------
+
+class ChatbotOut(BaseModel):
+    id: str
+    tenant_id: str
+    name: str
+    description: str | None
+    system_prompt: str
+    llm_selection: dict[str, Any]
+    pipeline_config: dict[str, Any]
+    widget_config: dict[str, Any]
+    kb_ids: list[str]
+
+    @classmethod
+    def from_view(cls, v: ChatbotView) -> "ChatbotOut":
+        return cls(
+            id=str(v.id),
+            tenant_id=str(v.tenant_id),
+            name=v.name,
+            description=v.description,
+            system_prompt=v.system_prompt,
+            llm_selection=v.llm_selection.to_dict(),
+            pipeline_config=v.pipeline_config.to_dict(),
+            widget_config=v.widget_config,
+            kb_ids=[str(i) for i in v.kb_ids],
+        )
+
+
+# --- Routes -----------------------------------------------------------------
+
+@router.post("", status_code=201, response_model=ChatbotOut)
+async def create_(
+    body: CreateChatbotIn,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+) -> ChatbotOut:
+    try:
+        view = await create_chatbot(
+            session, ctx,
+            name=body.name,
+            description=body.description,
+            system_prompt=body.system_prompt,
+            llm_selection=body.llm_selection.to_vo(),
+            kb_ids=body.kb_ids,
+            pipeline_config=body.pipeline_config.to_vo(),
+            widget_config=body.widget_config,
+        )
+    except ChatbotAlreadyExistsError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IncompatibleEmbeddingsError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except KnowledgeBaseNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValidationError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return ChatbotOut.from_view(view)
+
+
+@router.get("", response_model=list[ChatbotOut])
+async def list_(
+    limit: int = 20,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+) -> list[ChatbotOut]:
+    views = await list_chatbots(session, ctx, limit=limit, offset=offset)
+    return [ChatbotOut.from_view(v) for v in views]
+
+
+@router.get("/{chatbot_id}", response_model=ChatbotOut)
+async def get_(
+    chatbot_id: UUID,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+) -> ChatbotOut:
+    try:
+        view = await get_chatbot(session, ctx, chatbot_id=chatbot_id)
+    except ChatbotNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return ChatbotOut.from_view(view)
+
+
+@router.patch("/{chatbot_id}", response_model=ChatbotOut)
+async def patch_(
+    chatbot_id: UUID,
+    body: UpdateChatbotIn,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+) -> ChatbotOut:
+    try:
+        view = await update_chatbot(
+            session, ctx,
+            chatbot_id=chatbot_id,
+            name=body.name,
+            description=body.description,
+            system_prompt=body.system_prompt,
+            llm_selection=body.llm_selection.to_vo() if body.llm_selection else None,
+            kb_ids=body.kb_ids,
+            pipeline_config=body.pipeline_config.to_vo() if body.pipeline_config else None,
+            widget_config=body.widget_config,
+        )
+    except ChatbotNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except IncompatibleEmbeddingsError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except KnowledgeBaseNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValidationError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return ChatbotOut.from_view(view)
+
+
+@router.delete("/{chatbot_id}", status_code=204)
+async def delete_(
+    chatbot_id: UUID,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+) -> None:
+    try:
+        await delete_chatbot(session, ctx, chatbot_id=chatbot_id)
+    except ChatbotNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

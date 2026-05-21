@@ -5,6 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tfm_rag.application.chat.list_sessions import (
+    SessionSummaryView,
+    list_sessions,
+)
 from tfm_rag.application.chatbot_config.create_chatbot import (
     ChatbotView,
     create_chatbot,
@@ -235,3 +239,40 @@ async def delete_(
         await delete_chatbot(session, ctx, chatbot_id=chatbot_id)
     except ChatbotNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+class SessionSummaryOut(BaseModel):
+    id: str
+    chatbot_id: str
+    origin: str
+    created_at: str
+    last_activity_at: str
+
+    @classmethod
+    def from_view(cls, v: SessionSummaryView) -> "SessionSummaryOut":
+        return cls(
+            id=str(v.id),
+            chatbot_id=str(v.chatbot_id),
+            origin=v.origin,
+            created_at=v.created_at.isoformat(),
+            last_activity_at=v.last_activity_at.isoformat(),
+        )
+
+
+@router.get("/{chatbot_id}/sessions", response_model=list[SessionSummaryOut])
+async def list_sessions_(
+    chatbot_id: UUID,
+    limit: int = 20,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+) -> list[SessionSummaryOut]:
+    try:
+        views = await list_sessions(
+            session, ctx,
+            chatbot_id=chatbot_id,
+            limit=limit, offset=offset,
+        )
+    except ChatbotNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return [SessionSummaryOut.from_view(v) for v in views]

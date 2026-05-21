@@ -23,5 +23,6 @@ build/
 # Data
 backend/data/
 storage/
+!backend/src/**/storage/
 qdrant_data/
 postgres_data/

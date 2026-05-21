@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -13,7 +13,6 @@ from tfm_rag.infrastructure.persistence.models.chat_sessions import (
 )
 from tfm_rag.infrastructure.persistence.repository import (
     BaseRepository,
-    RequestContext,
 )
 
 
@@ -56,7 +55,7 @@ class ChatSessionRepository(BaseRepository[ChatSessionRow]):
                 ChatSessionRow.id == session_id,
                 ChatSessionRow.tenant_id == self._ctx.tenant_id,
             )
-            .values(last_activity_at=datetime.now(timezone.utc))
+            .values(last_activity_at=datetime.now(UTC))
         )
 
 

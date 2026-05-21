@@ -14,6 +14,8 @@ from tfm_rag.application.chat.get_session import (
 from tfm_rag.domain.errors.chat import SessionNotFoundError
 from tfm_rag.infrastructure.api.dependencies import (
     get_current_context,
+)
+from tfm_rag.infrastructure.api.dependencies import (
     get_session as get_db_session,
 )
 from tfm_rag.infrastructure.persistence.repository import RequestContext

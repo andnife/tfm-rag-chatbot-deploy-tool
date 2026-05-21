@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -26,8 +26,8 @@ def _session_row(session_id=None, chatbot_id=None, tenant_id=None) -> MagicMock:
     row.tenant_id = tenant_id or uuid4()
     row.origin = "playground"
     row.public_session_cookie = None
-    row.created_at = datetime.now(timezone.utc)
-    row.last_activity_at = datetime.now(timezone.utc)
+    row.created_at = datetime.now(UTC)
+    row.last_activity_at = datetime.now(UTC)
     return row
 
 
@@ -39,7 +39,7 @@ def _message_row(session_id) -> MagicMock:
     row.content = "hello"
     row.citations = []
     row.metadata_ = {}
-    row.created_at = datetime.now(timezone.utc)
+    row.created_at = datetime.now(UTC)
     return row
 
 

@@ -1,7 +1,7 @@
 # Handover — sesión de brainstorming TFM RAG Platform
 
-**Última actualización:** 2026-05-20, sesión 5 (M1 COMPLETO — 6 plans escritos e implementados; 22 unit tests passing; integration tests deferred hasta Docker).
-**Continuación:** seguir con plan #7 (CAP-KB-LIFECYCLE, primer plan de M2).
+**Última actualización:** 2026-05-21, sesión 6 (M2 abierto — plan #7 CAP-KB-LIFECYCLE escrito e implementado; 44 unit + 10 integration tests passing; Docker WSL2 operativo y stack levantado end-to-end).
+**Continuación:** seguir con plan #8 (CAP-KB-DOC-SOURCES — loader pdf/docx/txt/csv/md/xlsx + chunker + embedder + IngestSource).
 
 Este documento es el punto de entrada para retomar el trabajo. Si lo estás leyendo en una sesión nueva: empieza aquí, no por el `.log`.
 
@@ -262,11 +262,11 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 
 ## 8. Cómo continuar en la próxima sesión
 
-### Estado actual al cierre de sesión 5
+### Estado actual al cierre de sesión 6
 
 **Rama:** `feat/cap-01-infra-persistence` (todo en una rama; cuando se quiera abrir PRs por CAP se rebasarán en branches separadas).
 
-**Plans implementados (6/17):**
+**Plans implementados (7/17):**
 | # | CAP | Tag | Estado |
 |---|---|---|---|
 | 01 | CAP-INFRA-PERSISTENCE | `cap-01-infra-persistence` | ✅ |
@@ -275,38 +275,53 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 | 04 | CAP-INFRA-ASYNC-JOBS | `cap-04-infra-async-jobs` | ✅ (tabla diferida a plan #7) |
 | 05 | CAP-AUTH-IDENTITY | `cap-05-auth-identity` | ✅ |
 | 06 | CAP-INTEG-CREDENTIALS | `cap-06-integ-credentials` | ✅ |
+| 07 | CAP-KB-LIFECYCLE | `cap-07-kb-lifecycle` | ✅ |
 
-**M1 COMPLETO**. Demo end-to-end posible (con Docker): `docker compose up` → register → login → ver panel vacío con Ollama default + posibilidad de añadir más providers.
+**M1 cerrado y verificado E2E con Docker real (sesión 6).** Stack levantado, todos los integration tests acumulados pasan. **M2 abierto**: plan #7 ship CRUD de KnowledgeBases + ops polimórficas de Sources (List/Detach/TestConnection) + colección Qdrant on-demand por `(tenant, dim)`.
 
-**Verificación al cierre:**
+**Verificación al cierre de sesión 6 (stack Docker vivo):**
 - `ruff check .` ✅ All checks passed
-- `mypy src/` ✅ Success: no issues found in 62 source files
-- `pytest tests/ -m "not integration"` ✅ 22 passed (5-7 integration tests deselected — esperan Docker)
+- `mypy src/` ✅ Success: no issues found in 83 source files
+- `pytest tests/ -m "not integration"` ✅ 44 passed (10 deselected)
+- `pytest tests/integration -m integration` ✅ **10 passed** contra Postgres + Qdrant + Ollama vivos
 
-**Plans pendientes (11/17):** #7 KB-LIFECYCLE → #8 KB-DOC-SOURCES → #9 KB-DB-SOURCES → #10 CHATBOT-LIFECYCLE → #11 CHATBOT-WIDGET-CONFIG → #12 CHAT-DOC-RETRIEVAL → #13 CHAT-SQL-EXECUTION → #14 CHAT-SESSIONS → #15 CHAT-AGENT-LOOP → #16 WIDGET-RUNTIME → #17 EVAL-RAGAS.
+**Bug fixes y notas de la sesión 6:**
+- **Bug real corregido en `bootstrap_tenant`** (commit `e21c658`): el FK ordering fallaba — SQLAlchemy no detecta dependencia de inserción entre `TenantRow` y `ProviderCredentialRow` sin un `relationship()` declarado. Fix: flush intermedio entre `session.add(tenant)` y `session.add(credential)`. Lo descubrieron los integration tests en cuanto Docker estuvo arriba — los unit tests no lo cogieron porque mockean el repo.
+- **Tests de migración stale relajados:** `test_alembic_baseline_marks_db` y `test_users_tenants_migration` asseraban `version_num == "0001"/"0002"`. Ahora verifican el side-effect (versión no-null + tablas presentes), no la revisión congelada. Plans futuros que añadan migración no los rompen.
+- **Hack `__test__ = False` en use case `test_source_connection`** (plan #7): cuando un use case se llama `test_*` (porque el spec dice `TestX`) y el test file lo importa, pytest lo colecciona como test. `func.__test__ = False` es el patrón aceptado en este repo. Plan #6 no tuvo el problema porque su `test_credential` solo se importa desde el router, no desde tests.
+- **Workaround `_deps._session_factory = None` en fixtures de integration tests de routers** (plan #7): el `_session_factory` global en `infrastructure/api/dependencies.py` queda acoplado al primer event loop. Con `asyncio_mode=auto` (loop por test) hay clash cross-loop. Reset en la fixture `_clean_*_tables`. Nota arquitectónica: refactor candidato a `app.state.session_factory` en lifespan FastAPI cuando toque plan #10.
+
+**Plans pendientes (10/17):** #8 KB-DOC-SOURCES → #9 KB-DB-SOURCES → #10 CHATBOT-LIFECYCLE → #11 CHATBOT-WIDGET-CONFIG → #12 CHAT-DOC-RETRIEVAL → #13 CHAT-SQL-EXECUTION → #14 CHAT-SESSIONS → #15 CHAT-AGENT-LOOP → #16 WIDGET-RUNTIME → #17 EVAL-RAGAS.
 
 ### Workflow de ejecución acordado con el usuario
 
-Para minimizar interrupciones:
+Para minimizar interrupciones (confirmado y validado en sesión 6):
 - **Una sola rama** por ahora (`feat/cap-01-infra-persistence`); cuando el usuario quiera PRs separados, hacer rebase por CAP.
 - **Subagent-driven** con dispatches por batches de 2-3 tareas (haiku para tareas mecánicas, sonnet para integración).
-- **NO correr ruff/mypy/pytest dentro de subagents** — el controller hace un pase global cada ~3-4 plans (cleanup commit cuando haga falta).
+- **NO correr ruff/mypy/pytest dentro de subagents** — el controller hace un pase global al final del plan (cleanup commit cuando haga falta + tag movido al cleanup).
 - **NO usar reviewers (spec/quality) salvo dudas serias** — son demasiado caros para el ritmo del TFM.
-- Cada subagent puede dejar dudas en `subagent-questions.md` (formato en cabecera).
+- Cada subagent puede dejar dudas en `subagent-questions.md` (formato en cabecera). El controller cierra las dudas al final del plan con respuesta `✅ Aceptada`.
 
 ### Próximo paso concreto en la siguiente sesión
 
 1. Saluda y confirma que lees handover.
-2. Lee `subagent-questions.md` — varias entradas pendientes (Docker no disponible, decisión `import os`, etc.). Pregunta al usuario si quiere atenderlas antes de seguir.
-3. Escribe `docs/superpowers/plans/2026-05-20-07-cap-kb-lifecycle.md` con la plantilla de los anteriores (file structure + tasks TDD con código completo).
+2. Verifica que Docker sigue arriba (`docker compose ps` desde `infra/`); si no, levantar postgres+qdrant+ollama. El `.env` ya tiene secretos válidos (`JWT_SECRET` y `FERNET_KEY` generados en sesión 6).
+3. Escribe `docs/superpowers/plans/YYYY-MM-DD-08-cap-kb-doc-sources.md` siguiendo la plantilla del #7.
+   - Use cases a cubrir: `AttachDocumentSource(upload | cloud)`, `IngestSource`, `ReindexSource`.
+   - Adapters: `document_loaders` (pdf/docx/txt/csv/md/xlsx), `cloud_storage` (gdrive/s3), `chunkers`, `embedders`.
+   - Wire la `IngestionJob` table (deferida en plan #4) y conectarla al jobs runner.
+   - Registrar el **document** connection tester en `SOURCE_CONNECTION_TESTERS` (cloud folder reachability).
+   - Tabla `ingestion_jobs` + polling endpoint.
 4. Implementa con subagents en batches (haiku para mecánico, sonnet para integración).
-5. Tag `cap-07-kb-lifecycle` al cierre.
+5. Tag `cap-08-kb-doc-sources` al cierre + mover tag tras cleanup commit.
 
 ### Pendientes / riesgos conocidos
 
-- **Docker no disponible en WSL2** — todos los integration tests están deselected (`-m "not integration"`). El usuario debe activar la integración WSL en Docker Desktop antes de validar M1 end-to-end.
-- **Tag movido tras cleanup** — `cap-06-integ-credentials` ahora apunta al cleanup commit (`6ebe672`), no al feat original (`b78299f`).
-- **Branch `feat/cap-01-infra-persistence`** acumula 6 CAPs. Cuando se quiera abrir PRs separadas, rebasear en branches por tag.
+- **Docker WSL2 operativo** — `docker compose up -d postgres qdrant ollama` desde `infra/` funciona. Ollama image (~3.86 GB) descargada y volúmenes persistentes.
+- **Tags movidos tras cleanup** — `cap-06-integ-credentials` → `6ebe672`, `cap-07-kb-lifecycle` → `e56950c` (no a los `feat:` originales). Convención consolidada.
+- **Branch `feat/cap-01-infra-persistence`** acumula 7 CAPs. Cuando se quiera abrir PRs separadas, rebasear en branches por tag.
+- **`_session_factory` global** en `infrastructure/api/dependencies.py` — funciona en producción pero acopla tests al primer event loop. Refactor a `app.state.session_factory` en lifespan FastAPI: pendiente, candidato para plan #10 si la necesidad reaparece.
+- **Qdrant client 1.18.0 vs server 1.12.0** — warning en cada llamada; no bloqueante. Pin alineado pendiente.
 
 ### Cómo ejecutar el stack manualmente (cuando Docker esté disponible)
 
@@ -346,11 +361,13 @@ curl -X POST http://localhost:8000/api/auth/register \
 ```
 #1-#7  [completed] Diseño (15 secciones HTML + 10 preguntas
                    respondidas + writing-plans invocado)
-#8     [in_progress] Escribir + implementar 17 plans (6/17 hechos)
-                     ✅ Plans 01-06 (M1 cerrado, todos tagged)
-                     ⏳ Plans 07-17 (M2-M7)
-#9     [pending]     Ejecutar integration tests con Docker disponible
+#8     [in_progress] Escribir + implementar 17 plans (7/17 hechos)
+                     ✅ Plans 01-06 (M1 cerrado, todos tagged + E2E verificado con Docker real)
+                     ✅ Plan 07 (M2 abierto, KB-LIFECYCLE shipped)
+                     ⏳ Plans 08-17 (resto de M2-M7)
+#9     [completed]   Ejecutar integration tests con Docker disponible
+                     (cerrado en sesión 6 — 10/10 passing contra stack real)
 #10    [pending]     PR(s) — decidir si uno por CAP o uno por M
 ```
 
-Estado actual: en pausa para handover. La siguiente sesión arranca con plan #7.
+Estado actual: en pausa para handover. La siguiente sesión arranca con plan #8 (KB-DOC-SOURCES).

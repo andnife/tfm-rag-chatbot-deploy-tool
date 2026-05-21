@@ -7,6 +7,7 @@ from tfm_rag.infrastructure.api.routers import (
     auth,
     credentials,
     health,
+    ingestion_jobs,
     knowledge_bases,
 )
 from tfm_rag.infrastructure.settings import get_settings
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(credentials.router)
     app.include_router(knowledge_bases.router)
+    app.include_router(ingestion_jobs.router)
     return app
 
 

@@ -1,9 +1,11 @@
+from datetime import datetime, timezone
 from typing import Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tfm_rag.application.knowledge.create_knowledge_base import (
     KnowledgeBaseView,
@@ -33,13 +35,39 @@ from tfm_rag.domain.errors.knowledge import (
 )
 from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
+from tfm_rag.application.knowledge.attach_document_source import (
+    attach_document_source,
+)
+from tfm_rag.application.knowledge.ingest_source import (
+    IngestionContext,
+    run_ingestion_pipeline,
+)
+from tfm_rag.application.knowledge.reindex_source import purge_source_chunks
 from tfm_rag.infrastructure.api.dependencies import (
+    _get_factory,  # noqa: PLC2701
     get_current_context,
     get_session,
 )
+from tfm_rag.infrastructure.chunkers.fixed_size import FixedSizeChunker
+from tfm_rag.infrastructure.document_loaders.dispatcher import LoaderDispatcher
+from tfm_rag.infrastructure.document_loaders.pdf import PdfLoader
+from tfm_rag.infrastructure.document_loaders.txt import TxtLoader
+from tfm_rag.infrastructure.embedders.ollama import OllamaEmbedder
+from tfm_rag.infrastructure.jobs.runner import JobsRunner
+from tfm_rag.infrastructure.persistence.models.ingestion_jobs import (
+    IngestionJobRow,
+)
+from tfm_rag.infrastructure.persistence.models.knowledge_bases import (
+    KnowledgeBaseRow,
+)
+from tfm_rag.infrastructure.persistence.models.sources import SourceRow
 from tfm_rag.infrastructure.persistence.repository import RequestContext
 from tfm_rag.infrastructure.settings import Settings, get_settings
-from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore
+from tfm_rag.infrastructure.storage.local import LocalStorage
+from tfm_rag.infrastructure.vector_store.qdrant_client import (
+    QdrantStore,
+    collection_name_for,
+)
 
 router = APIRouter(prefix="/api/knowledge-bases", tags=["knowledge"])
 
@@ -294,3 +322,261 @@ async def test_connection_(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     result = await test_source_connection(spec_type=body.type, spec=body.spec)
     return {"ok": result.ok, "error": result.error, "details": result.details}
+
+
+def _storage(settings: Settings) -> LocalStorage:
+    return LocalStorage(root=settings.storage_local_path)
+
+
+def _loader_dispatcher() -> LoaderDispatcher:
+    return LoaderDispatcher([PdfLoader(), TxtLoader()])
+
+
+async def _ingest_in_background(
+    *,
+    factory: async_sessionmaker[AsyncSession],
+    qdrant_url: str,
+    qdrant_api_key: str | None,
+    settings: Settings,
+    job_id: UUID,
+    tenant_id: UUID,
+) -> None:
+    """Background pipeline. Opens its own session and Qdrant client.
+
+    Updates `ingestion_jobs.status/progress/error/finished_at` as the pipeline
+    progresses. Never raises — failures are written to the row.
+    """
+    qdrant = QdrantStore(url=qdrant_url, api_key=qdrant_api_key)
+    try:
+        async with factory() as session:
+            # Load job + source + KB
+            job = (await session.execute(
+                select(IngestionJobRow).where(
+                    IngestionJobRow.id == job_id,
+                    IngestionJobRow.tenant_id == tenant_id,
+                )
+            )).scalar_one()
+            source = (await session.execute(
+                select(SourceRow).where(SourceRow.id == job.source_id)
+            )).scalar_one()
+            kb = (await session.execute(
+                select(KnowledgeBaseRow).where(
+                    KnowledgeBaseRow.id == source.kb_id,
+                    KnowledgeBaseRow.tenant_id == tenant_id,
+                )
+            )).scalar_one()
+
+            chunking = ChunkingConfig.from_dict(kb.chunking_config)
+            selection = EmbeddingSelection.from_dict(kb.embedding_selection)
+            collection = collection_name_for(tenant_id, selection.dim)
+
+            payload = source.payload
+            ctx = IngestionContext(
+                tenant_id=tenant_id,
+                kb_id=kb.id,
+                source_id=source.id,
+                storage_uri=payload["storage_uri"],
+                mime_type=payload["mime_type"],
+                filename=payload["filename"],
+                chunking_config=chunking,
+                embedding_selection=selection,
+                embedder_base_url=settings.ollama_base_url,
+                embedder_api_key=None,  # Ollama is keyless in M2
+                collection=collection,
+            )
+
+            # Mark as running
+            job.status = "running"
+            job.progress = 0
+            source.ingest_status = "running"
+            await session.commit()
+
+            async def _on_progress(p: int) -> None:
+                async with factory() as s2:
+                    await s2.execute(
+                        update(IngestionJobRow)
+                        .where(IngestionJobRow.id == job_id)
+                        .values(progress=p)
+                    )
+                    await s2.commit()
+
+            try:
+                await run_ingestion_pipeline(
+                    ctx,
+                    storage=_storage(settings),
+                    loader_dispatcher=_loader_dispatcher(),
+                    chunker=FixedSizeChunker(),
+                    embedder=OllamaEmbedder(),
+                    qdrant=qdrant,
+                    on_progress=_on_progress,
+                )
+            except Exception as exc:  # noqa: BLE001
+                async with factory() as s3:
+                    await s3.execute(
+                        update(IngestionJobRow)
+                        .where(IngestionJobRow.id == job_id)
+                        .values(
+                            status="failed",
+                            error=str(exc)[:1900],
+                            finished_at=datetime.now(timezone.utc),
+                        )
+                    )
+                    await s3.execute(
+                        update(SourceRow)
+                        .where(SourceRow.id == source.id)
+                        .values(
+                            ingest_status="failed",
+                            error=str(exc)[:1900],
+                        )
+                    )
+                    await s3.commit()
+                return
+
+            # Success
+            async with factory() as s4:
+                now = datetime.now(timezone.utc)
+                await s4.execute(
+                    update(IngestionJobRow)
+                    .where(IngestionJobRow.id == job_id)
+                    .values(
+                        status="done",
+                        progress=100,
+                        finished_at=now,
+                    )
+                )
+                await s4.execute(
+                    update(SourceRow)
+                    .where(SourceRow.id == source.id)
+                    .values(
+                        ingest_status="done",
+                        last_ingest_at=now,
+                        error=None,
+                    )
+                )
+                await s4.commit()
+    finally:
+        await qdrant.close()
+
+
+class UploadDocOut(BaseModel):
+    source_id: str
+    job_id: str
+
+
+@router.post(
+    "/{kb_id}/sources/documents",
+    status_code=201,
+    response_model=UploadDocOut,
+)
+async def upload_document_(
+    kb_id: UUID,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),  # noqa: B008
+    filename: str | None = Form(default=None),
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> UploadDocOut:
+    content = await file.read()
+    name = filename or file.filename or "document"
+    mime = file.content_type or "application/octet-stream"
+    try:
+        result = await attach_document_source(
+            session,
+            ctx,
+            _storage(settings),
+            kb_id=kb_id,
+            filename=name,
+            mime_type=mime,
+            content=content,
+        )
+    except KnowledgeBaseNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValidationError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    # Create the IngestionJob row in the same session (committed by get_session)
+    job_id = uuid4()
+    session.add(
+        IngestionJobRow(
+            id=job_id,
+            source_id=result.source_id,
+            tenant_id=ctx.tenant_id,
+            status="queued",
+            progress=0,
+        )
+    )
+    await session.flush()
+
+    factory = _get_factory(settings)
+    runner = JobsRunner(background_tasks)
+
+    async def _kick() -> None:
+        await _ingest_in_background(
+            factory=factory,
+            qdrant_url=settings.qdrant_url,
+            qdrant_api_key=settings.qdrant_api_key,
+            settings=settings,
+            job_id=job_id,
+            tenant_id=ctx.tenant_id,
+        )
+
+    runner.schedule(_kick)
+
+    return UploadDocOut(source_id=str(result.source_id), job_id=str(job_id))
+
+
+@router.post(
+    "/{kb_id}/sources/{source_id}/reindex",
+    status_code=201,
+    response_model=UploadDocOut,
+)
+async def reindex_source_(
+    kb_id: UUID,
+    source_id: UUID,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> UploadDocOut:
+    qdrant = _qdrant(settings)
+    try:
+        await purge_source_chunks(
+            session, ctx, qdrant,
+            kb_id=kb_id, source_id=source_id,
+        )
+    except KnowledgeBaseNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except SourceNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    finally:
+        await qdrant.close()
+
+    job_id = uuid4()
+    session.add(
+        IngestionJobRow(
+            id=job_id,
+            source_id=source_id,
+            tenant_id=ctx.tenant_id,
+            status="queued",
+            progress=0,
+        )
+    )
+    await session.flush()
+
+    factory = _get_factory(settings)
+    runner = JobsRunner(background_tasks)
+
+    async def _kick() -> None:
+        await _ingest_in_background(
+            factory=factory,
+            qdrant_url=settings.qdrant_url,
+            qdrant_api_key=settings.qdrant_api_key,
+            settings=settings,
+            job_id=job_id,
+            tenant_id=ctx.tenant_id,
+        )
+
+    runner.schedule(_kick)
+
+    return UploadDocOut(source_id=str(source_id), job_id=str(job_id))

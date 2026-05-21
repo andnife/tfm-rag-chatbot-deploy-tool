@@ -9,6 +9,8 @@ from tfm_rag.infrastructure.persistence.base import Base
 
 # Import all ORM model modules so Base.metadata sees them for autogenerate
 from tfm_rag.infrastructure.persistence.models import (
+    chatbot_knowledge_base,  # noqa: F401
+    chatbots,  # noqa: F401
     ingestion_jobs,  # noqa: F401
     knowledge_bases,  # noqa: F401
     provider_credentials,  # noqa: F401

@@ -1,4 +1,4 @@
-from tfm_rag.domain.errors.common import DomainError
+from tfm_rag.domain.errors.common import DomainError, NotFoundError
 
 
 class UnsupportedProviderError(DomainError):
@@ -11,3 +11,7 @@ class RetrievalError(DomainError):
     """Raised when the retrieval pipeline (embed + vector search) fails for
     a reason that isn't tenant-scope, not-found, or validation.
     """
+
+
+class SessionNotFoundError(NotFoundError):
+    """Raised when a ChatSession is not found in the tenant."""

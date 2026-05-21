@@ -1,8 +1,8 @@
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import delete, select
 from sqlalchemy.engine import CursorResult
-from typing import Any
 
 from tfm_rag.domain.errors.knowledge import KnowledgeBaseNotFoundError
 from tfm_rag.infrastructure.persistence.models.chatbot_knowledge_base import (

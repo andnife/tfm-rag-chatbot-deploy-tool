@@ -1,7 +1,7 @@
 # Handover — sesión de brainstorming TFM RAG Platform
 
-**Última actualización:** 2026-05-24, sesión 7 (**M3 CERRADO** — plan #15 implementado completo. 138 unit + 28 integration tests passing. La demo agéntica funciona end-to-end contra Ollama llama3.1 vivo: ingest doc → chat → respuesta con citas reales a la fuente. 12/17 plans done).
-**Continuación:** plans M4–M7 ortogonales a la demo principal. Sugerencia de orden: #11 (CHATBOT-WIDGET-CONFIG) o #16 (WIDGET-RUNTIME) si se quiere demo pública; #9 + #13 (KB-DB-SOURCES + CHAT-SQL-EXECUTION) si se quiere extender capacidad RAG; #17 (EVAL-RAGAS) si toca evaluación.
+**Última actualización:** 2026-05-24, sesión 8 (plan #17 EVAL-RAGAS en curso — Tasks 1-4/6 implementadas y commiteadas. Faltan Task 5 CLI + Task 6 integration e2e + cleanup. 159 unit tests passing. 12 plans tagged. Stack Docker vivo durante la sesión).
+**Continuación:** terminar plan #17 (Tasks 5 + 6 + cleanup) o cambiar de plan según prioridad. Stack Docker debe estar arriba para Task 6.
 
 Este documento es el punto de entrada para retomar el trabajo. Si lo estás leyendo en una sesión nueva: empieza aquí, no por el `.log`.
 
@@ -262,11 +262,11 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 
 ## 8. Cómo continuar en la próxima sesión
 
-### Estado actual al cierre de sesión 7
+### Estado actual al cierre de sesión 8
 
 **Rama:** `feat/cap-01-infra-persistence` (todo en una rama; cuando se quiera abrir PRs por CAP se rebasarán en branches separadas).
 
-**Plans implementados (12/17):**
+**Plans implementados (12/17 con tag; 1 más a 2 tasks de completar):**
 | # | CAP | Tag | Estado |
 |---|---|---|---|
 | 01 | CAP-INFRA-PERSISTENCE | `cap-01-infra-persistence` | ✅ |
@@ -281,6 +281,7 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 | 12 | CAP-CHAT-DOC-RETRIEVAL | `cap-12-chat-doc-retrieval` | ✅ (RetrieveDocs + utility endpoint `/search`) |
 | 14 | CAP-CHAT-SESSIONS | `cap-14-chat-sessions` | ✅ (sessions/messages + read endpoints + helpers para #15) |
 | 15 | CAP-CHAT-AGENT-LOOP | `cap-15-chat-agent-loop` | ✅ **M3 CERRADO** (LLM port + Ollama adapter + agent loop + `POST /chat`) |
+| 17 | CAP-EVAL-RAGAS | _(sin tag — parcial)_ | ⏳ **Tasks 1-4/6 commiteadas** (eval VOs + answer_query persist + RagasEvaluator + run_ragas_evaluation + report_writer). Falta CLI + integration test + cleanup. |
 
 **Cambio de orden frente al catálogo:** hemos saltado #9 (KB-DB-SOURCES, M4) y #11 (WIDGET-CONFIG) para priorizar la demo M3 (chatbot que responde sobre los docs de M2). El usuario lo confirmó en sesión 6.
 
@@ -292,6 +293,11 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 - `pytest tests/unit` ✅ **138 passed**
 - `pytest tests/integration -m integration` ✅ **28 passed** contra Postgres + Qdrant + Ollama (llama3.1 + bge-m3)
 
+**Verificación al cierre de sesión 8 (mid-plan-17):**
+- `pytest tests/unit` ✅ **138 + 21 nuevos = 159 passed** (17 Task1 + 4 Task2 + 5 Task3 + 9 Task4 — todo lo nuevo del plan #17 hasta ahora)
+- `ruff check .` + `mypy src/` NO ejecutados todavía (convención: cleanup al final del plan). Se harán cuando se cierre #17.
+- `pytest tests/integration -m integration`: sin cambios (28 passed — Task 6 es el que añade el 29º cuando se lance).
+
 **Bugs reales encontrados y arreglados en sesión 6:**
 - **`bootstrap_tenant` FK ordering** (commit `e21c658`): SQLAlchemy no detecta la dependencia de INSERT entre `TenantRow` y `ProviderCredentialRow` sin un `relationship()` declarado, así que emitía el credential primero → `ForeignKeyViolationError`. Fix: flush intermedio entre `session.add(tenant)` y `session.add(credential)`. Lo descubrieron los integration tests en cuanto Docker estuvo arriba — los unit tests no lo cogieron porque mockean el repo.
 - **`session.flush()` vs `session.commit()` en endpoints de upload + reindex** (plan #8 Task 5, fix dentro del commit `e88d6dc`): los endpoints hacían `flush()` antes de programar el background task. La corutina background abría su propia sesión y trataba de leer el `IngestionJobRow` antes de que la transacción de request se hubiera commiteado → "row not found". Fix: `flush()` → `commit()` en ambos endpoints.
@@ -301,6 +307,9 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 **Bugs reales encontrados y arreglados en sesión 7 (plan #15):**
 - **`httpx.BaseTransport` vs `AsyncBaseTransport`** (commit `226db16`, ollama.py:32): el adapter declaró `transport: httpx.BaseTransport | None` pero httpx.AsyncClient requiere `AsyncBaseTransport`. mypy lo cazó al pase de cleanup; httpx.MockTransport implementa ambos así que los unit tests no notaban nada en runtime.
 - **Llama3.1 no presente al primer intento de Task 5**: el contenedor `tfm-rag-ollama-1` arrancó sin modelos (volumen reciente). Subagent reportó BLOCKED. El usuario hizo `ollama pull llama3.1` en el host Ollama nativo. ANOTACIÓN IMPORTANTE: lo que mira la app NO es el contenedor Ollama, es **el Ollama nativo del host** (port 11434 binding gana el suyo). El contenedor está sombreado. Esto resuelve definitivamente el "Ollama dual potencial" que estaba como riesgo abierto en handovers previos.
+
+**Concerns reales encontrados en sesión 8 (plan #17):**
+- **ragas 0.4 + langchain-community 0.4 incompatibles** (Task 3, commit `32332f2`): `ragas/llms/base.py` (en 0.4) importa `from langchain_community.chat_models.vertexai import ChatVertexAI` y ese módulo fue eliminado en langchain-community 0.4. Fix: pin `ragas>=0.2,<0.3` + `langchain-community>=0.3,<0.4` en `pyproject.toml [project.optional-dependencies].eval`. Instaladas ragas 0.2.15 + langchain-community 0.3.31. Memorizado como project memory `project-ragas-version-pin` — futuras bumps no rompen esto.
 
 **Hacks legítimos consolidados como patrones del repo:**
 - **`func.__test__ = False`** cuando un use case se llama `test_*` (porque el spec dice `TestX`) y el test file lo importa directamente. Plan #6 no lo necesitó porque `test_credential` solo se importa desde el router; plan #7 lo necesitó para `test_source_connection`.
@@ -326,15 +335,26 @@ Para minimizar interrupciones (confirmado y validado en sesión 6):
 
 ### Próximo paso concreto en la siguiente sesión
 
-1. Saluda y confirma que lees handover.
-2. Verifica Docker arriba (`docker compose ps` desde `infra/`). Si no, `bash scripts/setup.sh`. **OJO**: el Ollama que la app usa es el del HOST (no el container), así que confirma `ollama list` desde el host también muestra `llama3.1` + `bge-m3`. Si no, `ollama pull llama3.1` + `ollama pull bge-m3`.
-3. Pregunta al usuario qué plan toca. Lista priorizada según valor de demo:
-   - **#11 (CHATBOT-WIDGET-CONFIG)** + **#16 (WIDGET-RUNTIME)**: abren una demo pública con widget embebible — visible, vendible. Buena candidata para enseñar al tribunal.
-   - **#9 (KB-DB-SOURCES)** + **#13 (CHAT-SQL-EXECUTION)**: amplía RAG a sources SQL — agrega valor técnico pero la demo M3 ya cubre el grueso del TFM.
-   - **#17 (EVAL-RAGAS)**: harness de evaluación con métricas — es lo que pide la rúbrica de proyecto si va a haber un "capítulo de evaluación".
-4. Una vez elegido, sigue el workflow del handover (writing-plans → subagent-driven-development → cleanup + tag).
+**Estado al pausar la sesión 8: plan #17 (EVAL-RAGAS) parcial — 4/6 tasks committed, sin tag todavía.**
 
-**M3 está hecho** — los siguientes plans son ortogonales a la demo principal.
+Commits del plan #17 hechos:
+- `4add02e` feat(eval): Task 1 — EvaluationCase + EvaluationReport VOs + scenarios catalog + JSONL loader (17 tests)
+- `28e6422` feat(chat): Task 2 — AnswerView.retrieved_contexts + answer_query(persist=...) for eval (4 nuevos + 7 regresión #15)
+- `32332f2` feat(eval): Task 3 — RagasEvaluator adapter + eval extras (5 tests). **Concern resuelto**: `ragas>=0.2,<0.3` + `langchain-community>=0.3,<0.4` (ragas 0.4 importa ChatVertexAI de paths que langchain-community 0.4 quitó). Las versiones instaladas son ragas 0.2.15 + langchain-community 0.3.31. Memorizado.
+- `292c061` feat(eval): Task 4 — run_ragas_evaluation orchestrator + report writer (4+5=9 tests)
+
+Pendientes del plan #17:
+- **Task 5 (CLI)** — `backend/src/tfm_rag/cli/eval_ragas.py` con argparse + bootstrap DB. Plan tiene el código verbatim. **Haiku, ~5 min**.
+- **Task 6 (integration test e2e)** — `backend/tests/integration/test_eval_ragas_cli_flow.py`. Slow (~3-6 min). Requiere Docker + Ollama llama3.1 + bge-m3 en el host. Plan tiene el código verbatim. **Sonnet**.
+- **Cleanup** — `ruff check . --fix`, `mypy src/`, `pytest tests/ -m "not integration"`. Si autofix, commit `chore(plan-17): ruff autofix`. Tag `cap-17-eval-ragas` al cleanup commit (o al commit de Task 6 si cleanup no hace nada). Convención del repo.
+
+Pasos al retomar:
+1. Lee este handover.
+2. Verifica Docker arriba. **OJO con Ollama dual**: la app usa el Ollama del HOST. `ollama list` desde el host debe mostrar `llama3.1` + `bge-m3`. Si faltan, `ollama pull` en el host (no en el container).
+3. Si quieres terminar #17, lanza Task 5 directamente con el código verbatim de `docs/superpowers/plans/2026-05-24-17-cap-eval-ragas.md` Task 5; luego Task 6; luego cleanup + tag.
+4. Si quieres cambiar de plan, decide entre #9 (KB-DB-SOURCES, M4), #11 (WIDGET-CONFIG), #13 (CHAT-SQL-EXECUTION), #16 (WIDGET-RUNTIME).
+
+**M3 está hecho** — los plans restantes son ortogonales a la demo principal. La pieza académica (#17) está a 2 tasks de cerrar.
 
 ### Pendientes / riesgos conocidos
 

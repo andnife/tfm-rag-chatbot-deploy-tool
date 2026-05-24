@@ -30,6 +30,15 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
 ]
+eval = [
+    "ragas>=0.2,<0.3",
+    "langchain-ollama>=0.2",
+    "langchain-community>=0.3,<0.4",
+    "datasets>=3.0",
+]
+
+[project.scripts]
+eval-ragas = "tfm_rag.cli.eval_ragas:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,7 +1,7 @@
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
@@ -74,6 +74,7 @@ class AnswerView:
     content: str
     citations: list[Citation]
     iterations: list[RetrievalIteration]
+    retrieved_contexts: list[str] = field(default_factory=list, hash=False)
 
 
 _SYSTEM_META_PROMPT = (
@@ -122,6 +123,7 @@ async def answer_query(
     chatbot_id: UUID,
     session_id: UUID | None,
     user_message: str,
+    persist: bool = True,
 ) -> AnswerView:
     """Agent-loop use case: answers `user_message` for `chatbot_id`,
     persisting both user + assistant turns to the session.
@@ -156,22 +158,30 @@ async def answer_query(
 
     # --- Step 2: ensure a session exists ---
     if session_id is None:
-        session_id = await create_session(
-            session, ctx,
-            chatbot_id=chatbot_id,
-            origin="playground",
-            public_session_cookie=None,
-        )
+        if persist:
+            session_id = await create_session(
+                session, ctx,
+                chatbot_id=chatbot_id,
+                origin="playground",
+                public_session_cookie=None,
+            )
+        else:
+            # Throwaway UUID — no DB row exists. Eval flows don't read
+            # session_id off the view; keep the type non-Optional so the
+            # HTTP path doesn't have to deal with None.
+            from uuid import uuid4 as _uuid4
+            session_id = _uuid4()
 
     # --- Step 3: append user message ---
-    await append_message(
-        session, ctx,
-        session_id=session_id,
-        role="user",
-        content=user_message,
-        citations=None,
-        metadata=None,
-    )
+    if persist:
+        await append_message(
+            session, ctx,
+            session_id=session_id,
+            role="user",
+            content=user_message,
+            citations=None,
+            metadata=None,
+        )
 
     # --- Step 4: the agent loop ---
     llm = llm_dispatcher.for_provider(llm_selection.provider_id)
@@ -300,17 +310,22 @@ async def answer_query(
         citations = []
 
     metadata = {"iterations": [it.to_dict() for it in iterations]}
-    message_id = await append_message(
-        session, ctx,
-        session_id=session_id,
-        role="assistant",
-        content=assistant_content,
-        citations=[c.to_dict() for c in citations],
-        metadata=metadata,
-    )
+    if persist:
+        message_id = await append_message(
+            session, ctx,
+            session_id=session_id,
+            role="assistant",
+            content=assistant_content,
+            citations=[c.to_dict() for c in citations],
+            metadata=metadata,
+        )
+    else:
+        from uuid import uuid4 as _uuid4
+        message_id = _uuid4()
 
     # --- Step 7: bump activity ---
-    await touch_session(session, ctx, session_id=session_id)
+    if persist:
+        await touch_session(session, ctx, session_id=session_id)
 
     return AnswerView(
         session_id=session_id,
@@ -318,4 +333,5 @@ async def answer_query(
         content=assistant_content,
         citations=citations,
         iterations=iterations,
+        retrieved_contexts=[c.content for c in seen_chunks.values()],
     )

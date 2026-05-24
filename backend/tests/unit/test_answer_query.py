@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -13,8 +12,6 @@ from tfm_rag.domain.catalog.agent_tools import (
 )
 from tfm_rag.domain.errors.chatbot import ChatbotNotFoundError
 from tfm_rag.domain.errors.common import NotFoundError
-from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
-from tfm_rag.domain.value_objects.llm_selection import LLMSelection
 from tfm_rag.domain.value_objects.pipeline_config import PipelineConfig
 from tfm_rag.domain.value_objects.retrieval_iteration import (
     LLMTextResponse,

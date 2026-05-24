@@ -1,4 +1,3 @@
-import pytest
 
 from tfm_rag.domain.catalog import agent_tools
 

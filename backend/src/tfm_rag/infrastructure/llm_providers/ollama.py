@@ -31,7 +31,7 @@ class OllamaLLMAdapter:
     def __init__(
         self,
         *,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
         timeout: float | None = None,
     ) -> None:
         self._transport = transport

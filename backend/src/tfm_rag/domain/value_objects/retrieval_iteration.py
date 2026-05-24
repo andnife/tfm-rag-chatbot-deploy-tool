@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, TypeAlias
+from typing import Any
 
 from tfm_rag.domain.errors.common import ValidationError
 
@@ -79,4 +79,4 @@ class LLMTextResponse:
     text: str
 
 
-LLMResponse: TypeAlias = LLMToolCall | LLMTextResponse
+type LLMResponse = LLMToolCall | LLMTextResponse

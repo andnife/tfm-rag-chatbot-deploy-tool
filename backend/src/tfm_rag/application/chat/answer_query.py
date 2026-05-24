@@ -7,9 +7,9 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tfm_rag.application.chat.retrieve_docs import retrieve_docs as _real_retrieve_docs
-from tfm_rag.application.chat.create_session import create_session as _real_create_session
 from tfm_rag.application.chat.append_message import append_message as _real_append_message
+from tfm_rag.application.chat.create_session import create_session as _real_create_session
+from tfm_rag.application.chat.retrieve_docs import retrieve_docs as _real_retrieve_docs
 from tfm_rag.application.chat.touch_session import touch_session as _real_touch_session
 from tfm_rag.domain.catalog.agent_tools import (
     TOOL_ABSTAIN,

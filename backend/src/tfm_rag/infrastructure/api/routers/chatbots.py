@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tfm_rag.application.chat.answer_query import AnswerView, answer_query
 from tfm_rag.application.chat.list_sessions import (
     SessionSummaryView,
     list_sessions,
@@ -17,6 +18,7 @@ from tfm_rag.application.chatbot_config.delete_chatbot import delete_chatbot
 from tfm_rag.application.chatbot_config.get_chatbot import get_chatbot
 from tfm_rag.application.chatbot_config.list_chatbots import list_chatbots
 from tfm_rag.application.chatbot_config.update_chatbot import update_chatbot
+from tfm_rag.domain.errors.chat import LLMError, LLMTimeoutError
 from tfm_rag.domain.errors.chatbot import (
     ChatbotAlreadyExistsError,
     ChatbotNotFoundError,
@@ -26,16 +28,22 @@ from tfm_rag.domain.errors.knowledge import (
     IncompatibleEmbeddingsError,
     KnowledgeBaseNotFoundError,
 )
+from tfm_rag.domain.value_objects.citation import Citation
 from tfm_rag.domain.value_objects.llm_selection import LLMSelection
 from tfm_rag.domain.value_objects.pipeline_config import (
     GenerationConfig,
     PipelineConfig,
 )
+from tfm_rag.domain.value_objects.retrieval_iteration import RetrievalIteration
 from tfm_rag.infrastructure.api.dependencies import (
     get_current_context,
     get_session,
 )
+from tfm_rag.infrastructure.embedders.dispatcher import EmbedderDispatcher
+from tfm_rag.infrastructure.llm_providers.dispatcher import LLMDispatcher
 from tfm_rag.infrastructure.persistence.repository import RequestContext
+from tfm_rag.infrastructure.settings import Settings, get_settings
+from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore
 
 router = APIRouter(prefix="/api/chatbots", tags=["chatbots"])
 
@@ -276,3 +284,101 @@ async def list_sessions_(
     except ChatbotNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return [SessionSummaryOut.from_view(v) for v in views]
+
+
+# --- Chat endpoint ----------------------------------------------------------
+
+class ChatIn(BaseModel):
+    session_id: UUID | None = None
+    message: str = Field(..., min_length=1, max_length=8000)
+
+
+class _CitationOut(BaseModel):
+    chunk_id: str
+    source_id: str
+    source_name: str
+    location: str
+    score: float
+
+    @classmethod
+    def from_vo(cls, c: Citation) -> "_CitationOut":
+        return cls(
+            chunk_id=c.chunk_id,
+            source_id=str(c.source_id),
+            source_name=c.source_name,
+            location=c.location,
+            score=c.score,
+        )
+
+
+class _IterationOut(BaseModel):
+    index: int
+    tool: str
+    query: str | None
+    num_chunks: int | None
+    latency_ms: float
+
+    @classmethod
+    def from_vo(cls, it: RetrievalIteration) -> "_IterationOut":
+        return cls(
+            index=it.index, tool=it.tool, query=it.query,
+            num_chunks=it.num_chunks, latency_ms=it.latency_ms,
+        )
+
+
+class ChatOut(BaseModel):
+    session_id: str
+    message_id: str
+    content: str
+    citations: list[_CitationOut]
+    iterations: list[_IterationOut]
+
+    @classmethod
+    def from_view(cls, v: AnswerView) -> "ChatOut":
+        return cls(
+            session_id=str(v.session_id),
+            message_id=str(v.message_id),
+            content=v.content,
+            citations=[_CitationOut.from_vo(c) for c in v.citations],
+            iterations=[_IterationOut.from_vo(i) for i in v.iterations],
+        )
+
+
+@router.post("/{chatbot_id}/chat", response_model=ChatOut)
+async def chat_(
+    chatbot_id: UUID,
+    body: ChatIn,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> ChatOut:
+    # Match the existing per-request pattern in knowledge_bases.py: create
+    # QdrantStore here and close it in `finally`. Dispatchers are stateless
+    # and rebuilt per-request (cheap — see EmbedderDispatcher.default()).
+    qdrant = QdrantStore(settings.qdrant_url, settings.qdrant_api_key)
+    try:
+        view = await answer_query(
+            session, ctx,
+            llm_dispatcher=LLMDispatcher.default(),
+            qdrant=qdrant,
+            embedder_dispatcher=EmbedderDispatcher.default(),
+            settings=settings,
+            chatbot_id=chatbot_id,
+            session_id=body.session_id,
+            user_message=body.message,
+        )
+    except ChatbotNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except IncompatibleEmbeddingsError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except KnowledgeBaseNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LLMTimeoutError as exc:
+        raise HTTPException(status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
+    except LLMError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except ValidationError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    finally:
+        await qdrant.close()
+    return ChatOut.from_view(view)

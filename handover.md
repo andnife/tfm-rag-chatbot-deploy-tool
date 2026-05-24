@@ -1,7 +1,7 @@
 # Handover — sesión de brainstorming TFM RAG Platform
 
-**Última actualización:** 2026-05-21, sesión 6 (M3 en camino — plans #7, #8, #10, #12, #14 escritos e implementados; 105 unit + 25 integration tests passing contra Postgres + Qdrant + Ollama vivos. M2 demo MVP operativa; ya hay búsqueda semántica end-to-end y persistencia de sesiones lista para el agent loop).
-**Continuación:** seguir con plan #15 (CAP-CHAT-AGENT-LOOP — última pieza de M3: LLM port + Ollama adapter + agent loop + `POST /api/chatbots/{id}/chat` + VOs `Citation` y `RetrievalIteration`).
+**Última actualización:** 2026-05-24, sesión 7 (**M3 CERRADO** — plan #15 implementado completo. 138 unit + 28 integration tests passing. La demo agéntica funciona end-to-end contra Ollama llama3.1 vivo: ingest doc → chat → respuesta con citas reales a la fuente. 12/17 plans done).
+**Continuación:** plans M4–M7 ortogonales a la demo principal. Sugerencia de orden: #11 (CHATBOT-WIDGET-CONFIG) o #16 (WIDGET-RUNTIME) si se quiere demo pública; #9 + #13 (KB-DB-SOURCES + CHAT-SQL-EXECUTION) si se quiere extender capacidad RAG; #17 (EVAL-RAGAS) si toca evaluación.
 
 Este documento es el punto de entrada para retomar el trabajo. Si lo estás leyendo en una sesión nueva: empieza aquí, no por el `.log`.
 
@@ -262,11 +262,11 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 
 ## 8. Cómo continuar en la próxima sesión
 
-### Estado actual al cierre de sesión 6
+### Estado actual al cierre de sesión 7
 
 **Rama:** `feat/cap-01-infra-persistence` (todo en una rama; cuando se quiera abrir PRs por CAP se rebasarán en branches separadas).
 
-**Plans implementados (11/17):**
+**Plans implementados (12/17):**
 | # | CAP | Tag | Estado |
 |---|---|---|---|
 | 01 | CAP-INFRA-PERSISTENCE | `cap-01-infra-persistence` | ✅ |
@@ -280,22 +280,27 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 | 10 | CAP-CHATBOT-LIFECYCLE | `cap-10-chatbot-lifecycle` | ✅ (CRUD + N:M + RESTRICT FK + embedding compat) |
 | 12 | CAP-CHAT-DOC-RETRIEVAL | `cap-12-chat-doc-retrieval` | ✅ (RetrieveDocs + utility endpoint `/search`) |
 | 14 | CAP-CHAT-SESSIONS | `cap-14-chat-sessions` | ✅ (sessions/messages + read endpoints + helpers para #15) |
+| 15 | CAP-CHAT-AGENT-LOOP | `cap-15-chat-agent-loop` | ✅ **M3 CERRADO** (LLM port + Ollama adapter + agent loop + `POST /chat`) |
 
 **Cambio de orden frente al catálogo:** hemos saltado #9 (KB-DB-SOURCES, M4) y #11 (WIDGET-CONFIG) para priorizar la demo M3 (chatbot que responde sobre los docs de M2). El usuario lo confirmó en sesión 6.
 
-**M1 cerrado + M2 demo MVP operativa + M3 a una pieza (plan #15) de estar completa.** Lo que ya funciona end-to-end contra el stack vivo: register → KB con embedding Ollama → upload PDF/TXT → ingestion async con polling → chunks en Qdrant → `POST /api/knowledge-bases/{kb_id}/search` devuelve los chunks relevantes con score. Además: CRUD de chatbots con validación cross-KB de embedding (`IncompatibleEmbeddingsError`), tablas `chat_sessions`/`chat_messages` con cascada completa desde chatbots, y endpoints de lectura `GET /api/chatbots/{id}/sessions` + `GET /api/sessions/{id}`. Solo falta el `AnswerQuery` agent loop.
+**M1 + M2 + M3 cerrados.** Lo que funciona end-to-end contra el stack vivo: register → KB con embedding Ollama → upload PDF/TXT → ingestion async con polling → chunks en Qdrant → CRUD de chatbots con validación cross-KB de embedding → sesiones de chat con cascada → **`POST /api/chatbots/{id}/chat` ejecuta el agent loop con llama3.1, llamando `search_docs` y devolviendo respuesta con citas reales y telemetría por iteración**. Demo verificada en sesión 7: pregunta sobre la guerra civil española → respuesta menciona 1939 + cita manual.txt.
 
-**Verificación al cierre de sesión 6 (stack Docker vivo):**
+**Verificación al cierre de sesión 7 (stack Docker vivo):**
 - `ruff check .` ✅ All checks passed
-- `mypy src/` ✅ Success: no issues found in 135 source files
-- `pytest tests/ -m "not integration"` ✅ **105 passed** (25 deselected)
-- `pytest tests/integration -m integration` ✅ **25 passed** contra Postgres + Qdrant + Ollama vivos
+- `mypy src/` ✅ Success: no issues found in 143 source files
+- `pytest tests/unit` ✅ **138 passed**
+- `pytest tests/integration -m integration` ✅ **28 passed** contra Postgres + Qdrant + Ollama (llama3.1 + bge-m3)
 
 **Bugs reales encontrados y arreglados en sesión 6:**
 - **`bootstrap_tenant` FK ordering** (commit `e21c658`): SQLAlchemy no detecta la dependencia de INSERT entre `TenantRow` y `ProviderCredentialRow` sin un `relationship()` declarado, así que emitía el credential primero → `ForeignKeyViolationError`. Fix: flush intermedio entre `session.add(tenant)` y `session.add(credential)`. Lo descubrieron los integration tests en cuanto Docker estuvo arriba — los unit tests no lo cogieron porque mockean el repo.
 - **`session.flush()` vs `session.commit()` en endpoints de upload + reindex** (plan #8 Task 5, fix dentro del commit `e88d6dc`): los endpoints hacían `flush()` antes de programar el background task. La corutina background abría su propia sesión y trataba de leer el `IngestionJobRow` antes de que la transacción de request se hubiera commiteado → "row not found". Fix: `flush()` → `commit()` en ambos endpoints.
 - **`qdrant-client 1.18.0` cambió la API** (commit `c80c7cd`): `.search()` eliminado a favor de `.query_points()`. El subagent del plan #12 lo migró internamente sin cambiar la firma de `QdrantStore.search`. Solo se descubrió al correr el test e2e contra Qdrant real.
 - **Tests de migración stale relajados:** `test_alembic_baseline_marks_db` y `test_users_tenants_migration` asseraban `version_num == "0001"/"0002"`. Ahora verifican el side-effect (versión no-null + tablas presentes), no la revisión congelada. Plans futuros que añadan migración no los rompen.
+
+**Bugs reales encontrados y arreglados en sesión 7 (plan #15):**
+- **`httpx.BaseTransport` vs `AsyncBaseTransport`** (commit `226db16`, ollama.py:32): el adapter declaró `transport: httpx.BaseTransport | None` pero httpx.AsyncClient requiere `AsyncBaseTransport`. mypy lo cazó al pase de cleanup; httpx.MockTransport implementa ambos así que los unit tests no notaban nada en runtime.
+- **Llama3.1 no presente al primer intento de Task 5**: el contenedor `tfm-rag-ollama-1` arrancó sin modelos (volumen reciente). Subagent reportó BLOCKED. El usuario hizo `ollama pull llama3.1` en el host Ollama nativo. ANOTACIÓN IMPORTANTE: lo que mira la app NO es el contenedor Ollama, es **el Ollama nativo del host** (port 11434 binding gana el suyo). El contenedor está sombreado. Esto resuelve definitivamente el "Ollama dual potencial" que estaba como riesgo abierto en handovers previos.
 
 **Hacks legítimos consolidados como patrones del repo:**
 - **`func.__test__ = False`** cuando un use case se llama `test_*` (porque el spec dice `TestX`) y el test file lo importa directamente. Plan #6 no lo necesitó porque `test_credential` solo se importa desde el router; plan #7 lo necesitó para `test_source_connection`.
@@ -308,7 +313,7 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 - **`python-multipart>=0.0.9`** añadido en plan #8 como dep (lo requiere FastAPI para `File`/`Form` uploads).
 - **Scripts de bootstrap creados (sesión 6):** `scripts/setup.sh` (instalación idempotente en PC nuevo) + `scripts/run-backend.sh` (arrancar uvicorn con las env vars correctas). README en raíz reescrito como entry point completo.
 
-**Plans pendientes (6/17):** #9 KB-DB-SOURCES (M4) → #11 CHATBOT-WIDGET-CONFIG → #13 CHAT-SQL-EXECUTION → #15 CHAT-AGENT-LOOP (cierra M3) → #16 WIDGET-RUNTIME → #17 EVAL-RAGAS.
+**Plans pendientes (5/17):** #9 KB-DB-SOURCES (M4) → #11 CHATBOT-WIDGET-CONFIG → #13 CHAT-SQL-EXECUTION → #16 WIDGET-RUNTIME → #17 EVAL-RAGAS. Todos ortogonales a la demo M3 ya operativa.
 
 ### Workflow de ejecución acordado con el usuario
 
@@ -322,35 +327,24 @@ Para minimizar interrupciones (confirmado y validado en sesión 6):
 ### Próximo paso concreto en la siguiente sesión
 
 1. Saluda y confirma que lees handover.
-2. Verifica que Docker sigue arriba (`docker compose ps` desde `infra/`); si no, `bash scripts/setup.sh` (idempotente — chequea prereqs, levanta el stack, aplica migraciones, corre unit tests). El `.env` ya tiene secretos válidos (`JWT_SECRET` y `FERNET_KEY` generados en sesión 6).
-3. Escribe `docs/superpowers/plans/YYYY-MM-DD-15-cap-chat-agent-loop.md`. Pieza final de M3. Componentes:
-   - **LLM port + Ollama adapter**: `LLMProvider` (Protocol) con `generate(prompt, generation_config, tools=...) → ToolCall | FinalAnswer`. `OllamaLLMAdapter` POSTea a `/api/chat` con tool calling (Ollama 0.4+ lo soporta para llama3.1).
-   - **VOs nuevos**: `Citation` (id, source_id, source_name, location, chunk_id, score) y `RetrievalIteration` (index, tool_called, query?, num_chunks?, latency_ms?). Plan #14 los dejó como dicts JSONB; aquí los promueven a tipos.
-   - **Use case `AnswerQuery(chatbot_id, session_id?, user_message) → AnswerDTO`**: el agent loop.
-     - Si `session_id` es None → `create_session(origin="playground")`.
-     - `append_message(role="user", content=user_message)`.
-     - Loop hasta `max_retrieval_iterations` (1-5): LLM elige tool entre `search_docs`, `query_database`, `final_answer`, `abstain` (Q6.9: en M3 solo `search_docs` + `final_answer` + `abstain`, `query_database` cuando llegue #13).
-     - Cuando llega `final_answer` o se agota el budget: `append_message(role="assistant", content=..., citations=[...], metadata={iterations: [...]})`. `touch_session`.
-   - **API**: `POST /api/chatbots/{chatbot_id}/chat` con body `{session_id?, message}` → JSON `{session_id, message: {id, role, content, citations[], iterations[]}}`. **SSE diferido a un follow-up pequeño** — la demo funciona sin streaming.
-   - **Integration test**: end-to-end real contra Ollama llama3.1 (ya pulled). Ingiere un doc, crea chatbot, pregunta "qué es X", verifica que la respuesta cita el chunk correcto.
-4. Implementa con subagents en batches. **Plan #15 es probablemente el más grande del proyecto.** Sugerencia de batching:
-   - Batch 1 (haiku): LLM port + VOs (Citation, RetrievalIteration) + errores.
-   - Batch 2 (sonnet): Ollama LLM adapter + tool calling formato + unit tests con HTTP mocks.
-   - Batch 3 (sonnet): Use case `answer_query` con el agent loop + 10-15 unit tests con fakes.
-   - Batch 4 (sonnet): API endpoint + integration test e2e contra Ollama real.
-5. Tag `cap-15-chat-agent-loop` al cierre + mover tag tras cleanup commit.
+2. Verifica Docker arriba (`docker compose ps` desde `infra/`). Si no, `bash scripts/setup.sh`. **OJO**: el Ollama que la app usa es el del HOST (no el container), así que confirma `ollama list` desde el host también muestra `llama3.1` + `bge-m3`. Si no, `ollama pull llama3.1` + `ollama pull bge-m3`.
+3. Pregunta al usuario qué plan toca. Lista priorizada según valor de demo:
+   - **#11 (CHATBOT-WIDGET-CONFIG)** + **#16 (WIDGET-RUNTIME)**: abren una demo pública con widget embebible — visible, vendible. Buena candidata para enseñar al tribunal.
+   - **#9 (KB-DB-SOURCES)** + **#13 (CHAT-SQL-EXECUTION)**: amplía RAG a sources SQL — agrega valor técnico pero la demo M3 ya cubre el grueso del TFM.
+   - **#17 (EVAL-RAGAS)**: harness de evaluación con métricas — es lo que pide la rúbrica de proyecto si va a haber un "capítulo de evaluación".
+4. Una vez elegido, sigue el workflow del handover (writing-plans → subagent-driven-development → cleanup + tag).
 
-**Después de #15 la demo M3 está completa.** Los planes que faltan después (#9, #11, #13, #16, #17) son ortogonales: #9+#13 abren M4 (SQL sources), #11+#16 abren M5/M6 (widget público), #17 es la evaluación RAGAS (M7 / CLI).
+**M3 está hecho** — los siguientes plans son ortogonales a la demo principal.
 
 ### Pendientes / riesgos conocidos
 
 - **Docker WSL2 operativo** — `docker compose up -d postgres qdrant ollama` desde `infra/` funciona. Ollama image (~3.86 GB) descargada y volúmenes persistentes.
-- **Tags movidos tras cleanup (convención consolidada)** — todos los `cap-NN-*` apuntan al commit `chore(plan-NN): ruff autofix` final, no al `feat:` original. Última secuencia: cap-07 → e56950c, cap-08 → f545631, cap-10 → c23e5e4, cap-12 → c9aa7c2, cap-14 → db689b5.
+- **Tags movidos tras cleanup (convención consolidada)** — todos los `cap-NN-*` apuntan al commit `chore(plan-NN): ruff autofix` final, no al `feat:` original. Última secuencia: cap-07 → e56950c, cap-08 → f545631, cap-10 → c23e5e4, cap-12 → c9aa7c2, cap-14 → db689b5, cap-15 → 226db16.
 - **Branch `feat/cap-01-infra-persistence`** acumula 11 CAPs. Cuando se quiera abrir PRs separadas, rebasear en branches por tag.
 - **`_session_factory` global** en `infrastructure/api/dependencies.py` — sigue pendiente el refactor a `app.state.session_factory` en lifespan FastAPI. Cada vez que un test de integración nuevo toca routers necesita resetearlo en su fixture.
 - **Qdrant client 1.18.0 vs server 1.12.0** — warning en cada llamada; no bloqueante. La librería ya migró internamente de `.search()` a `.query_points()` (visto en plan #12).
-- **Ollama dual potencial** — instancia nativa en host *y* container `tfm-rag-ollama-1` ambos pueden enlazarse al puerto 11434. En sesión 6 ganó la del host. Pendiente investigar / parar la nativa con `systemctl --user stop ollama`. Documentado en troubleshooting del README.
-- **`citations` y `metadata.iterations` son JSONB opacos** hasta plan #15 — `chat_messages` los acepta pero ningún código los construye todavía. Plan #15 introduce los VOs `Citation` y `RetrievalIteration` con sus shapes oficiales.
+- **Ollama dual CONFIRMADO** — instancia nativa en host *y* container `tfm-rag-ollama-1` ambos intentan port 11434. **La nativa del host gana siempre**; el container está sombreado. Por tanto los modelos hay que pull-earlos en el host (`ollama pull llama3.1` desde el host, NO desde dentro del contenedor). Sesión 7 lo confirmó al desbloquear Task 5 de plan #15.
+- **VOs `Citation` + `RetrievalIteration` ahora con shapes oficiales** (plan #15). El JSONB de `chat_messages.citations` sigue el `Citation.to_dict()` y `chat_messages.metadata.iterations[i]` sigue `RetrievalIteration.to_dict()`. Cualquier code path que lea esos campos debe hidratarlos vía `.from_dict()`.
 - **Plan #8 OUT OF SCOPE pendiente como expansión horizontal:** cloud DocumentSource (gdrive/s3), loaders extra (docx/csv/md/xlsx), embedder `openai_compat`. La arquitectura (ports + LoaderDispatcher + EmbedderDispatcher) está lista — solo nuevos adapters registrados.
 - **Plan #12 OUT OF SCOPE pendiente:** reranker adapters (`BGECrossEncoderReranker`, `CohereRerankerAdapter`). El puerto está definido; `retrieve_docs` acepta un `Reranker` instance opcional.
 
@@ -386,9 +380,10 @@ PATCH  /api/chatbots/{chatbot_id}
 DELETE /api/chatbots/{chatbot_id}
 GET    /api/chatbots/{chatbot_id}/sessions                (plan #14)
 GET    /api/sessions/{session_id}                         (plan #14)
+POST   /api/chatbots/{chatbot_id}/chat                    (plan #15 — agent loop)
 ```
 
-Falta solo `POST /api/chatbots/{chatbot_id}/chat` (plan #15).
+**Demo M3 cerrada — todos los endpoints HTTP del MVP están en producción.**
 
 ### Cómo ejecutar el stack manualmente (cuando Docker esté disponible)
 
@@ -428,16 +423,15 @@ curl -X POST http://localhost:8000/api/auth/register \
 ```
 #1-#7  [completed] Diseño (15 secciones HTML + 10 preguntas
                    respondidas + writing-plans invocado)
-#8     [in_progress] Escribir + implementar 17 plans (11/17 hechos)
+#8     [in_progress] Escribir + implementar 17 plans (12/17 hechos)
                      ✅ Plans 01-06 (M1 cerrado, todos tagged + E2E verificado)
                      ✅ Plans 07-08 (M2 demo MVP — KB CRUD + ingestion + Qdrant)
-                     ✅ Plans 10, 12, 14 (M3 casi cerrado — chatbots + retrieval + sessions)
-                     ⏳ Plan 15 (cierra M3 con el agent loop)
-                     ⏳ Plans 09, 11, 13, 16, 17 (M4-M7)
+                     ✅ Plans 10, 12, 14, 15 (M3 CERRADO — chatbots + retrieval + sessions + agent loop)
+                     ⏳ Plans 09, 11, 13, 16, 17 (M4-M7, ortogonales a la demo principal)
 #9     [completed]   Ejecutar integration tests con Docker disponible
-                     (12/12 → 17/17 → 20/20 → 25/25 en sesión 6)
+                     (12/12 → 17/17 → 20/20 → 25/25 → 28/28 — sesión 7)
 #10    [pending]     PR(s) — decidir si uno por CAP o uno por M
 #11    [completed]   Bootstrap scripts + README + run-backend.sh (sesión 6)
 ```
 
-Estado actual: en pausa para handover. La siguiente sesión arranca con plan #15 (CHAT-AGENT-LOOP) que cierra M3.
+Estado actual: en pausa para handover. **M3 demo está operativa**: la siguiente sesión puede iniciar cualquiera de los plans M4-M7 según prioridad del usuario.

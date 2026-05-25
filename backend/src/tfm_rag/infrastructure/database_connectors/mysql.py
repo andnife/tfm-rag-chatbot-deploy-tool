@@ -1,7 +1,7 @@
 """MySQLConnector — asyncmy adapter for DatabaseConnector port."""
 import asyncio
 import datetime as _dt
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -55,7 +55,7 @@ class MySQLConnector(DatabaseConnector):
 
         tables = self._group_rows_to_tables(rows)
         return DatabaseSchemaSnapshot(
-            captured_at=datetime.now(timezone.utc),
+            captured_at=datetime.now(_dt.UTC),
             tables=tables,
         )
 
@@ -78,7 +78,7 @@ class MySQLConnector(DatabaseConnector):
                         await asyncio.wait_for(
                             cursor.execute(final_sql), timeout=_QUERY_TIMEOUT_S
                         )
-                    except asyncio.TimeoutError as exc:
+                    except TimeoutError as exc:
                         raise QueryExecutionError(
                             f"query timed out after {_QUERY_TIMEOUT_S:.0f}s"
                         ) from exc
@@ -96,7 +96,7 @@ class MySQLConnector(DatabaseConnector):
         truncated = len(rows_raw) >= effective_extra
         kept = rows_raw[:row_limit] if truncated else list(rows_raw)
         rows = tuple(
-            {col: _jsonable(value) for col, value in zip(columns, row)}
+            {col: _jsonable(value) for col, value in zip(columns, row, strict=False)}
             for row in kept
         )
         return SqlQueryResult(columns=columns, rows=rows, truncated=truncated)

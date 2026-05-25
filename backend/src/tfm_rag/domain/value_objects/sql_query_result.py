@@ -33,20 +33,20 @@ class SqlQueryResult:
         even if `rows` holds more (keeps the LLM context bounded)."""
         if not self.columns:
             return "(no columns)"
-        if not self.rows:
-            return f"| {' | '.join(self.columns)} |\n|{'|'.join(['---'] * len(self.columns))}|\n(0 rows)"
-        DISPLAY_CAP = 20
         head = f"| {' | '.join(self.columns)} |"
         sep = f"|{'|'.join(['---'] * len(self.columns))}|"
-        body_rows = self.rows[:DISPLAY_CAP]
+        if not self.rows:
+            return f"{head}\n{sep}\n(0 rows)"
+        display_cap = 20
+        body_rows = self.rows[:display_cap]
         lines = [head, sep]
         for r in body_rows:
             lines.append(
                 "| " + " | ".join(str(r.get(c, "")) for c in self.columns) + " |"
             )
         suffix = ""
-        if len(self.rows) > DISPLAY_CAP:
-            suffix = f"\n(showing {DISPLAY_CAP} of {len(self.rows)} rows)"
+        if len(self.rows) > display_cap:
+            suffix = f"\n(showing {display_cap} of {len(self.rows)} rows)"
         if self.truncated:
             suffix += "\n(result was truncated by the server limit)"
         return "\n".join(lines) + suffix

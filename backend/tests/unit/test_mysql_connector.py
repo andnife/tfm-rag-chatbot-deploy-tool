@@ -340,7 +340,7 @@ async def test_run_select_stringifies_uuid_and_datetime(
 
     rows = [(
         UUID("11111111-2222-3333-4444-555555555555"),
-        _dt.datetime(2026, 5, 25, 12, 0, tzinfo=_dt.timezone.utc),
+        _dt.datetime(2026, 5, 25, 12, 0, tzinfo=_dt.UTC),
         None,
     )]
     description = [("id",), ("ts",), ("n",)]

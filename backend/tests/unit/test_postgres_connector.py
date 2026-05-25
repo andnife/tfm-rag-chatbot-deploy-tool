@@ -292,7 +292,7 @@ async def test_run_select_stringifies_uuid_and_datetime(
 
     rows = [{
         "id": UUID("11111111-2222-3333-4444-555555555555"),
-        "ts": _dt.datetime(2026, 5, 25, 12, 0, tzinfo=_dt.timezone.utc),
+        "ts": _dt.datetime(2026, 5, 25, 12, 0, tzinfo=_dt.UTC),
         "n": None,
     }]
     conn = _FakeConnection({})

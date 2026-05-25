@@ -1,5 +1,5 @@
 """Unit tests for system_prompt.build_chatbot_system_prompt."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -35,7 +35,7 @@ def _db_source(
             "username": "u", "password_encrypted": "Zm9v",
             "ssl_mode": "disable",
             "schema_snapshot": {
-                "captured_at": datetime(2026, 5, 25, tzinfo=timezone.utc).isoformat(),
+                "captured_at": datetime(2026, 5, 25, tzinfo=UTC).isoformat(),
                 "tables": table_blocks,
             },
         },

@@ -2,7 +2,6 @@
 
 Slow test — runs the agent loop against live Ollama. ~30-90s.
 """
-import asyncio
 from typing import Any
 
 import asyncpg
@@ -176,7 +175,11 @@ async def test_chat_uses_query_database_for_count_question(
     query_db_iterations = [
         it for it in iterations if it.get("tool") == "query_database"
     ]
-    saw_db_usage = bool(query_db_iterations) or "3" in body["content"] or "user" in body["content"].lower()
+    saw_db_usage = (
+        bool(query_db_iterations)
+        or "3" in body["content"]
+        or "user" in body["content"].lower()
+    )
     assert saw_db_usage, (
         "Neither a query_database iteration nor a relevant answer text; got: "
         + str(body)

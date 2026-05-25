@@ -14,7 +14,6 @@ import re
 
 from tfm_rag.domain.errors.chat import UnsafeSQLError
 
-
 # Verbs that, if they appear as the leading non-whitespace token, mean
 # the statement mutates state. We reject any non-SELECT.
 _LEADING_VERB_RE = re.compile(

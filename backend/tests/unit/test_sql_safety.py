@@ -7,7 +7,6 @@ from tfm_rag.application.chat.sql_safety import (
 )
 from tfm_rag.domain.errors.chat import UnsafeSQLError
 
-
 # --- assert_select_only ------------------------------------------------------
 
 

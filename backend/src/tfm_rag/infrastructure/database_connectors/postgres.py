@@ -1,7 +1,7 @@
 """PostgresConnector — asyncpg adapter for DatabaseConnector port."""
 import asyncio
 import datetime as _dt
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -53,7 +53,7 @@ class PostgresConnector(DatabaseConnector):
 
         tables = self._group_rows_to_tables(rows)
         return DatabaseSchemaSnapshot(
-            captured_at=datetime.now(timezone.utc),
+            captured_at=datetime.now(_dt.UTC),
             tables=tables,
         )
 
@@ -76,7 +76,7 @@ class PostgresConnector(DatabaseConnector):
                 rows_raw = await asyncio.wait_for(
                     conn.fetch(final_sql), timeout=_QUERY_TIMEOUT_S
                 )
-            except asyncio.TimeoutError as exc:
+            except TimeoutError as exc:
                 raise QueryExecutionError(
                     f"query timed out after {_QUERY_TIMEOUT_S:.0f}s"
                 ) from exc
@@ -89,7 +89,10 @@ class PostgresConnector(DatabaseConnector):
             return SqlQueryResult(columns=(), rows=(), truncated=False)
 
         first = rows_raw[0]
-        columns = tuple(first.keys() if hasattr(first, "keys") else first.__class__.__annotations__.keys())
+        if hasattr(first, "keys"):
+            columns = tuple(first.keys())
+        else:
+            columns = tuple(first.__class__.__annotations__.keys())
         truncated = len(rows_raw) >= effective_extra
         kept = rows_raw[:row_limit] if truncated else rows_raw[:row_limit + 1]
         # Ensure we never return more than row_limit rows when truncated.

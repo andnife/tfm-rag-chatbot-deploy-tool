@@ -22,6 +22,8 @@ def test_retrieval_iteration_round_trip() -> None:
         "query": "what is X",
         "num_chunks": 3,
         "latency_ms": 482.0,
+        "sql": None,
+        "row_count": None,
     }
     assert RetrievalIteration.from_dict(data) == it
 

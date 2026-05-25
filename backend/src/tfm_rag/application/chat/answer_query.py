@@ -9,13 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tfm_rag.application.chat.append_message import append_message as _real_append_message
 from tfm_rag.application.chat.create_session import create_session as _real_create_session
-from tfm_rag.application.chat.retrieve_docs import retrieve_docs as _real_retrieve_docs
-from tfm_rag.application.chat.touch_session import touch_session as _real_touch_session
 from tfm_rag.application.chat.query_database import (
     QueryDatabaseInput,
+)
+from tfm_rag.application.chat.query_database import (
     query_database as _real_query_database,
 )
+from tfm_rag.application.chat.retrieve_docs import retrieve_docs as _real_retrieve_docs
 from tfm_rag.application.chat.system_prompt import build_chatbot_system_prompt
+from tfm_rag.application.chat.touch_session import touch_session as _real_touch_session
 from tfm_rag.domain.catalog.agent_tools import (
     TOOL_ABSTAIN,
     TOOL_FINAL_ANSWER,
@@ -28,16 +30,9 @@ from tfm_rag.domain.errors.chat import (
     QueryExecutionError,
     UnsafeSQLError,
 )
-from tfm_rag.domain.errors.knowledge import DatabaseConnectionError
-from tfm_rag.infrastructure.database_connectors import DATABASE_CONNECTORS
-from tfm_rag.infrastructure.persistence.repositories.sources_repo import (
-    SourceRepository,
-)
-from tfm_rag.infrastructure.secrets.fernet_encryptor import (
-    FernetSecretEncryptor,
-)
 from tfm_rag.domain.errors.chatbot import ChatbotNotFoundError
 from tfm_rag.domain.errors.common import NotFoundError
+from tfm_rag.domain.errors.knowledge import DatabaseConnectionError
 from tfm_rag.domain.value_objects.citation import Citation
 from tfm_rag.domain.value_objects.llm_selection import LLMSelection
 from tfm_rag.domain.value_objects.pipeline_config import PipelineConfig
@@ -47,6 +42,7 @@ from tfm_rag.domain.value_objects.retrieval_iteration import (
     RetrievalIteration,
 )
 from tfm_rag.domain.value_objects.retrieved_chunk import RetrievedChunk
+from tfm_rag.infrastructure.database_connectors import DATABASE_CONNECTORS
 from tfm_rag.infrastructure.embedders.dispatcher import EmbedderDispatcher
 from tfm_rag.infrastructure.llm_providers.dispatcher import LLMDispatcher
 from tfm_rag.infrastructure.persistence.repositories.chatbots_repo import (
@@ -55,7 +51,13 @@ from tfm_rag.infrastructure.persistence.repositories.chatbots_repo import (
 from tfm_rag.infrastructure.persistence.repositories.knowledge_bases_repo import (
     KnowledgeBaseRepository,
 )
+from tfm_rag.infrastructure.persistence.repositories.sources_repo import (
+    SourceRepository,
+)
 from tfm_rag.infrastructure.persistence.repository import RequestContext
+from tfm_rag.infrastructure.secrets.fernet_encryptor import (
+    FernetSecretEncryptor,
+)
 from tfm_rag.infrastructure.settings import Settings
 from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore
 
@@ -91,10 +93,7 @@ def _default_sources_repo(session: AsyncSession) -> SourceRepository:
     return SourceRepository(session)
 
 
-from collections.abc import Awaitable as _Awaitable
-from typing import Callable as _Callable
-
-QueryDatabaseFn = _Callable[..., _Awaitable[Any]]
+QueryDatabaseFn = Callable[..., Awaitable[Any]]
 
 
 def _default_query_database(
@@ -105,7 +104,7 @@ def _default_query_database(
     source_id: UUID,
     sql: str,
     row_limit: int,
-) -> _Awaitable[Any]:
+) -> Awaitable[Any]:
     sources_repo = SourceRepository(session)
     return _real_query_database(
         QueryDatabaseInput(

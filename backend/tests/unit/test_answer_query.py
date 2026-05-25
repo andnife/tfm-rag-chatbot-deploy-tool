@@ -5,13 +5,6 @@ from uuid import uuid4
 import pytest
 
 from tfm_rag.application.chat.answer_query import AnswerView, answer_query
-
-
-def _no_sources_repo_factory(_session: Any) -> Any:
-    """Stub sources repo that always returns an empty list (no DB sources)."""
-    repo = MagicMock()
-    repo.list_by_kb = AsyncMock(return_value=[])
-    return repo
 from tfm_rag.domain.catalog.agent_tools import (
     TOOL_ABSTAIN,
     TOOL_FINAL_ANSWER,
@@ -26,6 +19,13 @@ from tfm_rag.domain.value_objects.retrieval_iteration import (
 )
 from tfm_rag.domain.value_objects.retrieved_chunk import RetrievedChunk
 from tfm_rag.infrastructure.persistence.repository import RequestContext
+
+
+def _no_sources_repo_factory(_session: Any) -> Any:
+    """Stub sources repo that always returns an empty list (no DB sources)."""
+    repo = MagicMock()
+    repo.list_by_kb = AsyncMock(return_value=[])
+    return repo
 
 
 def _ctx() -> RequestContext:

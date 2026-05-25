@@ -22,6 +22,19 @@ class ChatbotRepository(BaseRepository[ChatbotRow]):
         )
         return (await self._session.execute(stmt)).scalar_one_or_none()
 
+    async def get_by_public_key(self, public_key: str) -> ChatbotRow | None:
+        """Look up a chatbot by its widget public key.
+
+        Returns None if not found. Does NOT filter by tenant — the caller
+        derives the tenant from the row's `tenant_id` afterwards (plan #16
+        public chat endpoint uses this to bootstrap a tenant-scoped session).
+        """
+        stmt = select(ChatbotRow).where(
+            ChatbotRow.public_key == public_key
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def list_kb_ids(self, chatbot_id: UUID) -> list[UUID]:
         stmt = select(ChatbotKnowledgeBaseRow.kb_id).where(
             ChatbotKnowledgeBaseRow.chatbot_id == chatbot_id,

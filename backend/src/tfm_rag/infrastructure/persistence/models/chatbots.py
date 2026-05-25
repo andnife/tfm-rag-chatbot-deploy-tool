@@ -38,6 +38,9 @@ class ChatbotRow(Base):
     )
     pipeline_config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     widget_config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    public_key: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

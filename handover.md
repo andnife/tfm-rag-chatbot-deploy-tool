@@ -1,7 +1,7 @@
 # Handover — sesión de brainstorming TFM RAG Platform
 
-**Última actualización:** 2026-05-25, sesión 11 (plan #13 CHAT-SQL-EXECUTION **CERRADO** — 6 tasks + tool query_database operativo en el agent loop. **255 unit tests passing**, 37 integration green + 1 flake pre-existente. **15/17 plans tagged. M4 funcional cerrado: chatbot responde sobre docs y SQL.** Tag `cap-13-chat-sql-execution` → `77d7661`).
-**Continuación:** quedan 2/17 plans — #11 (CHATBOT-WIDGET-CONFIG, pequeño) → #16 (WIDGET-RUNTIME, cierra M5 con el widget embebible). Ambos ortogonales a la demo M3+M4+M6 ya operativa.
+**Última actualización:** 2026-05-25, sesión 12 (plan #11 CHATBOT-WIDGET-CONFIG **CERRADO** — 5 tasks: WidgetConfig VO + public_key column + use cases + structured API + helper get_chatbot_by_public_key + CORS middleware. **293 unit tests passing**, 41/42 integration green. **16/17 plans tagged.** Tag `cap-11-chatbot-widget-config` → `61a125b`).
+**Continuación:** queda **1/17** — #16 (WIDGET-RUNTIME, cierra M5 con el widget JS embebible + endpoint público `/api/public/chatbots/{public_key}/chat`).
 
 Este documento es el punto de entrada para retomar el trabajo. Si lo estás leyendo en una sesión nueva: empieza aquí, no por el `.log`.
 
@@ -262,11 +262,11 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 
 ## 8. Cómo continuar en la próxima sesión
 
-### Estado actual al cierre de sesión 11
+### Estado actual al cierre de sesión 12
 
 **Rama:** `feat/cap-01-infra-persistence` (todo en una rama; cuando se quiera abrir PRs por CAP se rebasarán en branches separadas).
 
-**Plans implementados (15/17 con tag):**
+**Plans implementados (16/17 con tag):**
 | # | CAP | Tag | Estado |
 |---|---|---|---|
 | 01 | CAP-INFRA-PERSISTENCE | `cap-01-infra-persistence` | ✅ |
@@ -278,6 +278,7 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 | 07 | CAP-KB-LIFECYCLE | `cap-07-kb-lifecycle` | ✅ |
 | 08 | CAP-KB-DOC-SOURCES | `cap-08-kb-doc-sources` | ✅ (MVP: upload + PDF/TXT + Ollama + fixed_size) |
 | 09 | CAP-KB-DB-SOURCES | `cap-09-kb-db-sources` | ✅ (postgres + mysql adapters via asyncpg/asyncmy + test + introspect + encrypted credentials in payload) |
+| 11 | CAP-CHATBOT-WIDGET-CONFIG | `cap-11-chatbot-widget-config` | ✅ (WidgetConfig VO + public_key column + structured API + get_chatbot_by_public_key + CORS middleware scaffolding) |
 | 13 | CAP-CHAT-SQL-EXECUTION | `cap-13-chat-sql-execution` | ✅ (run_select on both connectors + sql_safety + query_database use case + system prompt con schema_snapshot + tool en agent loop + e2e). **M4 funcional cerrado.** |
 | 10 | CAP-CHATBOT-LIFECYCLE | `cap-10-chatbot-lifecycle` | ✅ (CRUD + N:M + RESTRICT FK + embedding compat) |
 | 12 | CAP-CHAT-DOC-RETRIEVAL | `cap-12-chat-doc-retrieval` | ✅ (RetrieveDocs + utility endpoint `/search`) |
@@ -315,6 +316,12 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 
 **Caveat de sesión 11 (anotado para entrega académica):** el test e2e `test_chat_uses_query_database_for_count_question` usa una aserción amplia — pasa si (a) hay una iteración con `tool="query_database"` O (b) el answer text contiene "3" o "user". Dado que "user" está en la pregunta y muy probablemente en la respuesta, la aserción amplia NO verifica positivamente que la herramienta `query_database` fuese llamada por el LLM. **Lo que sí está verificado**: (i) el system prompt incluye el schema_snapshot, (ii) el tool schema está registrado en `build_tool_schemas(include_query_database=True)` cuando hay DB sources, (iii) la rama del loop existe y funciona contra fakes (unit tests), (iv) el DML safety test (`test_chat_rejects_dml_via_unsafe_sql_path`) confirma que la DB no es tocada cuando se pide un DELETE. Si la tesis defensa requiere prueba positiva de invocación, correr el test en modo `-v -s` y verificar manualmente las iteraciones.
 
+**Verificación al cierre de sesión 12 (plan #11 cerrado):**
+- `ruff check .` ✅ All checks passed (5 autofixes + 2 manuales en cleanup commit `61a125b`: UP, unused imports, F821 forward-ref de WidgetConfig elevado a module-top, E501 wrap del operador ternario).
+- `mypy src/` ✅ Success: no issues found in **168 source files** (+2: widget_config VO + get_chatbot_by_public_key use case).
+- `pytest tests/ -m "not integration"` ✅ **293 passed**, 42 deselected. Salto desde 255 → 293 (+38 tests nuevos: 33 widget_config + 3 get_chatbot_by_public_key + 2 use case public_key).
+- `pytest tests/integration -m integration` ✅ **41 passed / 42 total** (1 new endpoint test Task 4 + 3 new widget_config endpoints Task 5). El flake `test_register_then_login_then_me_flow` persiste.
+
 **Bugs reales encontrados y arreglados en sesión 6:**
 - **`bootstrap_tenant` FK ordering** (commit `e21c658`): SQLAlchemy no detecta la dependencia de INSERT entre `TenantRow` y `ProviderCredentialRow` sin un `relationship()` declarado, así que emitía el credential primero → `ForeignKeyViolationError`. Fix: flush intermedio entre `session.add(tenant)` y `session.add(credential)`. Lo descubrieron los integration tests en cuanto Docker estuvo arriba — los unit tests no lo cogieron porque mockean el repo.
 - **`session.flush()` vs `session.commit()` en endpoints de upload + reindex** (plan #8 Task 5, fix dentro del commit `e88d6dc`): los endpoints hacían `flush()` antes de programar el background task. La corutina background abría su propia sesión y trataba de leer el `IngestionJobRow` antes de que la transacción de request se hubiera commiteado → "row not found". Fix: `flush()` → `commit()` en ambos endpoints.
@@ -339,7 +346,7 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 - **`python-multipart>=0.0.9`** añadido en plan #8 como dep (lo requiere FastAPI para `File`/`Form` uploads).
 - **Scripts de bootstrap creados (sesión 6):** `scripts/setup.sh` (instalación idempotente en PC nuevo) + `scripts/run-backend.sh` (arrancar uvicorn con las env vars correctas). README en raíz reescrito como entry point completo.
 
-**Plans pendientes (2/17):** #11 CHATBOT-WIDGET-CONFIG → #16 WIDGET-RUNTIME (M5). **Pieza académica (#17) + M4 funcional (#9 + #13) cerrados.** Quedan solo las piezas de UI embebible (M5).
+**Plans pendientes (1/17):** **#16 WIDGET-RUNTIME** (M5 — widget JS embebible + endpoint público `/api/public/chatbots/{public_key}/chat`). Todo el resto del backend está cerrado. #11 dejó listo el scaffolding: WidgetConfig.allowed_origins, public_key único por chatbot, helper `get_chatbot_by_public_key`, CORS middleware permisivo en `/api/public/*`.
 
 ### Workflow de ejecución acordado con el usuario
 
@@ -351,6 +358,31 @@ Para minimizar interrupciones (confirmado y validado en sesión 6):
 - Cada subagent puede dejar dudas en `subagent-questions.md` (formato en cabecera). El controller cierra las dudas al final del plan con respuesta `✅ Aceptada`.
 
 ### Próximo paso concreto en la siguiente sesión
+
+**Estado al cierre de sesión 12: plan #11 (CHATBOT-WIDGET-CONFIG) CERRADO — 5/5 tasks committed, tag movido a cleanup.**
+
+Commits del plan #11 (en orden):
+- `fcfc049` docs(plan): plan #11 — CAP-CHATBOT-WIDGET-CONFIG (5 tasks)
+- `1e04169` feat(domain): Task 1 — WidgetConfig VO + validación (theme, primary_color hex incluyendo 3-digit shorthand, position, title/welcome_message/placeholder con length bounds, allowed_origins con regex de origen + wildcard `*` + dedupe + cap 50). 33 unit tests (incl. parametrized).
+- `6f77fd8` feat(persistence): Task 2 — chatbots.public_key column (VARCHAR(64) unique indexed NOT NULL) + alembic migración `0008` con backfill via `secrets.token_urlsafe(32)` + `ChatbotRepository.get_by_public_key`.
+- `9770d75` feat(app): Task 3 — Chatbot entity con `widget_config: WidgetConfig` + `public_key: str`; create_chatbot genera public_key con prefijo `wgt_`; update_chatbot ignora public_key (inmutable). 2 nuevos unit tests. **Nota**: `ChatbotView` vive inline en `create_chatbot.py` y se reusa desde get/list — una sola edición cubrió todo.
+- `44f0c1a` feat(api): Task 4 — `WidgetConfigIn` (con `to_domain()`) + `WidgetConfigOut` (con `from_domain(raw_dict)` que usa `WidgetConfig.from_dict` tolerante a parciales para rows legacy) + `ChatbotOut.public_key`. Integration test `test_public_key_generated_and_immutable` (PATCH con `{"public_key": ...}` extra → 422 por Pydantic strict; public_key real no cambia).
+- `5b58ebc` feat(api): Task 5 — `get_chatbot_by_public_key` use case (tenant-agnostic, NO incluye la key en el mensaje de error para evitar enumeration) + CORS middleware permisivo (`allow_origins=["*"]`, `allow_credentials=False`). 3 unit + 3 integration tests.
+- `61a125b` chore(plan-11): cleanup ruff 5 autofixes + 2 manuales (UP, unused imports, F821 forward-ref de WidgetConfig elevado a top-level, E501 wrap). Tag movido aquí.
+
+**Tag aplicado**: `cap-11-chatbot-widget-config` → `61a125b` (cleanup commit, convención).
+
+**Notas técnicas (nuevas en sesión 12):**
+- **`public_key` shape**: prefix `wgt_` + 32 chars base64url (`secrets.token_urlsafe(32)`). Total ~46 chars. Unique constraint en DB + index. NO se rota (no hay endpoint para rotarla — sería un feature follow-up de plan #16 si el usuario lo pide).
+- **CORS middleware**: añadido en `app.py` después de `TenantScopingMiddleware`. **Permisivo intencionalmente** — `allow_origins=["*"]`, `allow_credentials=False` (browser security rule cuando es wildcard). Plan #16 lo va a NARROW per-chatbot via `widget_config.allowed_origins`: en la respuesta del endpoint público se setea `Access-Control-Allow-Origin` selectivamente. Eso vive en la capa de aplicación porque CORSMiddleware es global.
+- **`get_chatbot_by_public_key`**: deliberately tenant-agnostic. La key ES el security token. El caller (plan #16 endpoint) deriva el tenant del `view.tenant_id` retornado, y construye su propio `RequestContext` para las llamadas downstream tenant-scoped (sesiones, retrieval).
+- **Migración 0008 backfill**: la migración añade la columna como NULLABLE, hace UPDATE row-by-row con un `wgt_<random>` único por cada row existente, y luego enforce NOT NULL + UNIQUE + index. Esto permite que rows pre-existentes de plan #10 (sin public_key) sobrevivan al upgrade.
+- **`WidgetConfig.from_dict` es tolerante** a dicts parciales y vacíos. Esto es crucial para `WidgetConfigOut.from_domain(row.widget_config)`: chatbots de antes del plan #11 tienen `widget_config={}` o `{"theme": "light"}` — esos se cargan con defaults de los campos que faltan, sin romper.
+- **Pydantic strict-mode NO está activo** — pero `ChatbotOut.public_key` está declarado, así que un PATCH con `{"public_key": "wgt_attacker"}` cae en el `UpdateChatbotIn` schema (que NO declara `public_key`) y Pydantic devuelve 422 con "extra field not allowed". Confirmed by `test_public_key_generated_and_immutable`.
+
+---
+
+### Estado anterior — sesión 11 (plan #13 cerrado)
 
 **Estado al cierre de sesión 11: plan #13 (CHAT-SQL-EXECUTION) CERRADO — 6/6 tasks committed, tag movido a cleanup.**
 
@@ -432,7 +464,7 @@ Pasos al retomar:
 ### Pendientes / riesgos conocidos
 
 - **Docker WSL2 operativo** — `docker compose up -d postgres qdrant ollama` desde `infra/` funciona. Ollama image (~3.86 GB) descargada y volúmenes persistentes.
-- **Tags movidos tras cleanup (convención consolidada)** — todos los `cap-NN-*` apuntan al commit `chore(plan-NN): ruff autofix` final, no al `feat:` original. Última secuencia: cap-07 → e56950c, cap-08 → f545631, cap-10 → c23e5e4, cap-12 → c9aa7c2, cap-14 → db689b5, cap-15 → 226db16, cap-09 → 3ec7b13, **cap-13 → 77d7661**. **Excepción `cap-17` → `9e20cf6` (Task 6 e2e)**: cleanup se hizo antes de Task 6 (Docker caído al empezar la sesión 9), y el tag apunta al último commit del plan, no al cleanup. Sin impacto funcional.
+- **Tags movidos tras cleanup (convención consolidada)** — todos los `cap-NN-*` apuntan al commit `chore(plan-NN): ruff autofix` final, no al `feat:` original. Última secuencia: cap-07 → e56950c, cap-08 → f545631, cap-10 → c23e5e4, cap-12 → c9aa7c2, cap-14 → db689b5, cap-15 → 226db16, cap-09 → 3ec7b13, cap-13 → 77d7661, **cap-11 → 61a125b**. **Excepción `cap-17` → `9e20cf6` (Task 6 e2e)**: cleanup se hizo antes de Task 6 (Docker caído al empezar la sesión 9), y el tag apunta al último commit del plan, no al cleanup. Sin impacto funcional.
 - **Branch `feat/cap-01-infra-persistence`** acumula 11 CAPs. Cuando se quiera abrir PRs separadas, rebasear en branches por tag.
 - **`_session_factory` global** en `infrastructure/api/dependencies.py` — sigue pendiente el refactor a `app.state.session_factory` en lifespan FastAPI. Cada vez que un test de integración nuevo toca routers necesita resetearlo en su fixture.
 - **Qdrant client 1.18.0 vs server 1.12.0** — warning en cada llamada; no bloqueante. La librería ya migró internamente de `.search()` a `.query_points()` (visto en plan #12).
@@ -517,17 +549,17 @@ curl -X POST http://localhost:8000/api/auth/register \
 ```
 #1-#7  [completed] Diseño (15 secciones HTML + 10 preguntas
                    respondidas + writing-plans invocado)
-#8     [in_progress] Escribir + implementar 17 plans (15/17 hechos)
+#8     [in_progress] Escribir + implementar 17 plans (16/17 hechos)
                      ✅ Plans 01-06 (M1 cerrado, todos tagged + E2E verificado)
                      ✅ Plans 07-08-09 (M2 + M4-backend — KB CRUD + ingestion + Qdrant + DB attach)
-                     ✅ Plans 10, 12, 14, 15 (M3 CERRADO — chatbots + retrieval + sessions + agent loop)
+                     ✅ Plans 10, 11, 12, 14, 15 (M3 CERRADO + widget config — chatbots + retrieval + sessions + agent loop + WidgetConfig VO + public_key)
                      ✅ Plan 13 (M4 funcional CERRADO — query_database tool en el agent loop)
                      ✅ Plan 17 (M6 RAGAS eval CERRADO — VOs + RagasEvaluator + CLI + e2e test)
-                     ⏳ Plans 11, 16 (M5 widget config + widget runtime — único hito abierto)
+                     ⏳ Plan 16 (M5 widget runtime — único pendiente)
 #9     [completed]   Ejecutar integration tests con Docker disponible
-                     (12/12 → 17/17 → 20/20 → 25/25 → 28/28 → 29/29 → 35/36 → 37/38 — sesión 11)
+                     (12/12 → ... → 37/38 → 41/42 — sesión 12)
 #10    [pending]     PR(s) — decidir si uno por CAP o uno por M
 #11    [completed]   Bootstrap scripts + README + run-backend.sh (sesión 6)
 ```
 
-Estado actual: en pausa para handover. **M3 demo + M4 funcional (doc + SQL) + M6 eval académica operativas.** La siguiente sesión puede iniciar cualquiera de los 2 plans pendientes (#11, #16). **#11 es el natural "siguiente" porque #16 (widget runtime) consume la config del widget que #11 expone**.
+Estado actual: en pausa para handover. **M3 demo + M4 funcional (doc + SQL) + M6 eval académica + scaffolding M5 listos.** Queda **solo plan #16** (widget runtime — endpoint público + widget JS embebible). El scaffolding de #11 ya tiene listo todo lo que #16 necesita: public_key único por chatbot, `WidgetConfig.allowed_origins` para per-chatbot CORS narrowing, helper `get_chatbot_by_public_key`, CORS middleware permisivo.

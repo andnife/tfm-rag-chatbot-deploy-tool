@@ -109,22 +109,32 @@ _QUERY_DATABASE_SCHEMA: dict[str, Any] = {
     "function": {
         "name": TOOL_QUERY_DATABASE,
         "description": (
-            "Execute a SQL SELECT against an attached read-only database "
-            "source. (Plan #13 wires the executor; declared here so the "
-            "tool catalog has a single source of truth.)"
+            "Run a read-only SQL SELECT against ONE of the attached SQL "
+            "databases. The system prompt lists every available "
+            "`source_id` and the tables/columns each exposes. Use this "
+            "tool when the user's question requires live data, counts, "
+            "or aggregations over those tables. The system rejects any "
+            "statement that isn't a single SELECT."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "natural_language_request": {
+                "source_id": {
                     "type": "string",
                     "description": (
-                        "What you want to look up, in plain English. The "
-                        "text2sql layer will translate to SQL."
+                        "UUID of the DatabaseSource to query. Pick from "
+                        "the SQL database list in the system prompt."
+                    ),
+                },
+                "sql": {
+                    "type": "string",
+                    "description": (
+                        "A single read-only SELECT statement. Avoid SELECT * "
+                        "for large tables; project only the columns you need."
                     ),
                 },
             },
-            "required": ["natural_language_request"],
+            "required": ["source_id", "sql"],
         },
     },
 }

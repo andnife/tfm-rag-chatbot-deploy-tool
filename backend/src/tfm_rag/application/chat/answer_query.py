@@ -11,11 +11,30 @@ from tfm_rag.application.chat.append_message import append_message as _real_appe
 from tfm_rag.application.chat.create_session import create_session as _real_create_session
 from tfm_rag.application.chat.retrieve_docs import retrieve_docs as _real_retrieve_docs
 from tfm_rag.application.chat.touch_session import touch_session as _real_touch_session
+from tfm_rag.application.chat.query_database import (
+    QueryDatabaseInput,
+    query_database as _real_query_database,
+)
+from tfm_rag.application.chat.system_prompt import build_chatbot_system_prompt
 from tfm_rag.domain.catalog.agent_tools import (
     TOOL_ABSTAIN,
     TOOL_FINAL_ANSWER,
+    TOOL_QUERY_DATABASE,
     TOOL_SEARCH_DOCS,
     build_tool_schemas,
+)
+from tfm_rag.domain.errors.chat import (
+    DatabaseSourceMismatchError,
+    QueryExecutionError,
+    UnsafeSQLError,
+)
+from tfm_rag.domain.errors.knowledge import DatabaseConnectionError
+from tfm_rag.infrastructure.database_connectors import DATABASE_CONNECTORS
+from tfm_rag.infrastructure.persistence.repositories.sources_repo import (
+    SourceRepository,
+)
+from tfm_rag.infrastructure.secrets.fernet_encryptor import (
+    FernetSecretEncryptor,
 )
 from tfm_rag.domain.errors.chatbot import ChatbotNotFoundError
 from tfm_rag.domain.errors.common import NotFoundError
@@ -53,6 +72,7 @@ RetrieveDocs = Callable[..., Awaitable[list[RetrievedChunk]]]
 CreateSession = Callable[..., Awaitable[UUID]]
 AppendMessage = Callable[..., Awaitable[UUID]]
 TouchSession = Callable[..., Awaitable[None]]
+SourcesRepoFactory = Callable[[AsyncSession], SourceRepository]
 
 
 def _default_chatbot_repo(
@@ -65,6 +85,39 @@ def _default_kb_repo(
     session: AsyncSession, ctx: RequestContext
 ) -> KnowledgeBaseRepository:
     return KnowledgeBaseRepository(session, ctx)
+
+
+def _default_sources_repo(session: AsyncSession) -> SourceRepository:
+    return SourceRepository(session)
+
+
+from collections.abc import Awaitable as _Awaitable
+from typing import Callable as _Callable
+
+QueryDatabaseFn = _Callable[..., _Awaitable[Any]]
+
+
+def _default_query_database(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    allowed_kb_ids: tuple[UUID, ...],
+    source_id: UUID,
+    sql: str,
+    row_limit: int,
+) -> _Awaitable[Any]:
+    sources_repo = SourceRepository(session)
+    return _real_query_database(
+        QueryDatabaseInput(
+            allowed_kb_ids=allowed_kb_ids,
+            source_id=source_id,
+            sql=sql,
+            row_limit=row_limit,
+        ),
+        sources_repo=sources_repo,  # type: ignore[arg-type]
+        connectors=DATABASE_CONNECTORS,
+        encryptor=FernetSecretEncryptor(settings.fernet_key),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,11 +165,13 @@ async def answer_query(
     *,
     chatbot_repo_factory: ChatbotRepoFactory = _default_chatbot_repo,
     kb_repo_factory: KbRepoFactory = _default_kb_repo,
+    sources_repo_factory: SourcesRepoFactory = _default_sources_repo,
     llm_dispatcher: LLMDispatcher,
     retrieve_docs: RetrieveDocs = _real_retrieve_docs,
     create_session: CreateSession = _real_create_session,
     append_message: AppendMessage = _real_append_message,
     touch_session: TouchSession = _real_touch_session,
+    query_database_fn: QueryDatabaseFn = _default_query_database,
     qdrant: QdrantStore,
     embedder_dispatcher: EmbedderDispatcher,
     settings: Settings,
@@ -154,7 +209,25 @@ async def answer_query(
 
     llm_selection = LLMSelection.from_dict(row.llm_selection)
     pipeline = PipelineConfig.from_dict(row.pipeline_config)
-    system_prompt = row.system_prompt
+
+    # Load the chatbot's KB source rows so we can include DB schemas in the
+    # system prompt. Only `type='database'` entries contribute.
+    all_sources: list[dict[str, Any]] = []
+    sources_repo = sources_repo_factory(session)
+    for kb_id in kb_ids:
+        rows = await sources_repo.list_by_kb(kb_id)
+        for src_row in rows:
+            all_sources.append({
+                "source_id": src_row.id,
+                "type": src_row.type,
+                "payload": dict(src_row.payload or {}),
+            })
+    has_db_sources = any(s["type"] == "database" for s in all_sources)
+
+    base_system_prompt = row.system_prompt or ""
+    final_system_prompt = build_chatbot_system_prompt(
+        base_system_prompt, db_sources=all_sources,
+    )
 
     # --- Step 2: ensure a session exists ---
     if session_id is None:
@@ -189,10 +262,10 @@ async def answer_query(
     api_key: str | None = None
 
     messages: list[dict[str, Any]] = [
-        _build_system_message(system_prompt),
+        _build_system_message(final_system_prompt),
         {"role": "user", "content": user_message},
     ]
-    tools = build_tool_schemas()
+    tools = build_tool_schemas(include_query_database=has_db_sources)
 
     seen_chunks: dict[str, RetrievedChunk] = {}
     iterations: list[RetrievalIteration] = []
@@ -274,6 +347,81 @@ async def answer_query(
                 "role": "tool",
                 "name": TOOL_SEARCH_DOCS,
                 "content": _format_chunks_for_tool_result(chunks),
+            })
+            continue
+
+        elif resp.tool == TOOL_QUERY_DATABASE:
+            args = resp.arguments
+            raw_source_id = args.get("source_id")
+            raw_sql = args.get("sql")
+            if not isinstance(raw_source_id, str) or not isinstance(raw_sql, str):
+                # Treat as abstain — model emitted malformed args.
+                final_answer_text = "I tried to query a database but the request was malformed."
+                iterations.append(RetrievalIteration(
+                    index=i, tool=TOOL_QUERY_DATABASE,
+                    query=None, num_chunks=None, latency_ms=0.0,
+                    sql=None, row_count=None,
+                ))
+                break
+            t0_db = time.perf_counter()
+            try:
+                source_uuid = UUID(raw_source_id)
+            except ValueError:
+                # Malformed UUID; feed the model an error so it can recover.
+                iterations.append(RetrievalIteration(
+                    index=i, tool=TOOL_QUERY_DATABASE,
+                    query=None, num_chunks=None, latency_ms=0.0,
+                    sql=raw_sql, row_count=None,
+                ))
+                messages.append({
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{
+                        "function": {"name": TOOL_QUERY_DATABASE, "arguments": args},
+                    }],
+                })
+                messages.append({
+                    "role": "tool",
+                    "name": TOOL_QUERY_DATABASE,
+                    "content": f"error: source_id {raw_source_id!r} is not a valid UUID",
+                })
+                continue
+            try:
+                out = await query_database_fn(
+                    session,
+                    settings=settings,
+                    allowed_kb_ids=tuple(kb_ids),
+                    source_id=source_uuid,
+                    sql=raw_sql,
+                    row_limit=50,
+                )
+                tool_response_text = out.result.to_markdown()
+                iterations.append(RetrievalIteration(
+                    index=i, tool=TOOL_QUERY_DATABASE,
+                    query=None, num_chunks=None,
+                    latency_ms=(time.perf_counter() - t0_db) * 1000.0,
+                    sql=raw_sql, row_count=out.result.row_count,
+                ))
+            except (UnsafeSQLError, DatabaseSourceMismatchError,
+                    QueryExecutionError, DatabaseConnectionError) as exc:
+                tool_response_text = f"error: {exc}"
+                iterations.append(RetrievalIteration(
+                    index=i, tool=TOOL_QUERY_DATABASE,
+                    query=None, num_chunks=None,
+                    latency_ms=(time.perf_counter() - t0_db) * 1000.0,
+                    sql=raw_sql, row_count=0,
+                ))
+            messages.append({
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{
+                    "function": {"name": TOOL_QUERY_DATABASE, "arguments": args},
+                }],
+            })
+            messages.append({
+                "role": "tool",
+                "name": TOOL_QUERY_DATABASE,
+                "content": tool_response_text,
             })
             continue
 

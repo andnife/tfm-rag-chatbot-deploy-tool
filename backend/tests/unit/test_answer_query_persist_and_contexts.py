@@ -5,6 +5,13 @@ from uuid import uuid4
 import pytest
 
 from tfm_rag.application.chat.answer_query import answer_query
+
+
+def _no_sources_repo_factory(_session: Any) -> Any:
+    """Stub sources repo that always returns an empty list (no DB sources)."""
+    repo = MagicMock()
+    repo.list_by_kb = AsyncMock(return_value=[])
+    return repo
 from tfm_rag.domain.catalog.agent_tools import (
     TOOL_FINAL_ANSWER,
     TOOL_SEARCH_DOCS,
@@ -105,6 +112,7 @@ async def test_retrieved_contexts_populated_from_search_results() -> None:
         MagicMock(), ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=fake_retrieve,
         create_session=fake_create,
@@ -153,6 +161,7 @@ async def test_retrieved_contexts_dedup_by_point_id() -> None:
         MagicMock(), ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=fake_retrieve,
         create_session=fake_pass,
@@ -206,6 +215,7 @@ async def test_persist_false_skips_session_and_message_persistence() -> None:
         MagicMock(), ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=AsyncMock(return_value=[]),
         create_session=fake_create,
@@ -266,6 +276,7 @@ async def test_persist_true_default_still_persists() -> None:
         MagicMock(), ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=AsyncMock(return_value=[]),
         create_session=fake_create,

@@ -5,6 +5,13 @@ from uuid import uuid4
 import pytest
 
 from tfm_rag.application.chat.answer_query import AnswerView, answer_query
+
+
+def _no_sources_repo_factory(_session: Any) -> Any:
+    """Stub sources repo that always returns an empty list (no DB sources)."""
+    repo = MagicMock()
+    repo.list_by_kb = AsyncMock(return_value=[])
+    return repo
 from tfm_rag.domain.catalog.agent_tools import (
     TOOL_ABSTAIN,
     TOOL_FINAL_ANSWER,
@@ -112,6 +119,7 @@ async def test_answer_query_one_iteration_with_search_then_final() -> None:
         db, ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=retrieve,
         create_session=fake_create_session,
@@ -179,6 +187,7 @@ async def test_answer_query_abstain_branch() -> None:
         db, ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=AsyncMock(return_value=[]),
         create_session=fake_create,
@@ -245,6 +254,7 @@ async def test_answer_query_max_iterations_synthesises_abstain() -> None:
         db, ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=AsyncMock(return_value=[_chunk("noise")]),
         create_session=fake_create,
@@ -290,6 +300,7 @@ async def test_answer_query_text_response_treated_as_final() -> None:
         db, ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=AsyncMock(return_value=[]),
         create_session=fake_create,
@@ -369,6 +380,7 @@ async def test_answer_query_reuses_existing_session_when_id_passed() -> None:
         db, ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=AsyncMock(return_value=[]),
         create_session=fake_create,
@@ -424,6 +436,7 @@ async def test_answer_query_deduplicates_citations_across_iterations() -> None:
         db, ctx,
         chatbot_repo_factory=lambda s, c: chatbot_repo,
         kb_repo_factory=lambda s, c: MagicMock(),
+        sources_repo_factory=_no_sources_repo_factory,
         llm_dispatcher=dispatcher,
         retrieve_docs=fake_retrieve,
         create_session=fake_create,

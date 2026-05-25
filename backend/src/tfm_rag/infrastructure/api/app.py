@@ -1,11 +1,13 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from tfm_rag.infrastructure.api.middleware.tenant_scoping import (
     TenantScopingMiddleware,
+)
+from tfm_rag.infrastructure.api.middleware.widget_cors import (
+    NonOverwritingCORSMiddleware,
 )
 from tfm_rag.infrastructure.api.routers import (
     auth,
@@ -32,7 +34,7 @@ def create_app() -> FastAPI:
     # the response). Plan #11 ships permissive defaults so the embeddable
     # widget can prototype against a dev backend.
     app.add_middleware(
-        CORSMiddleware,
+        NonOverwritingCORSMiddleware,
         allow_origins=["*"],
         allow_credentials=False,
         allow_methods=["*"],

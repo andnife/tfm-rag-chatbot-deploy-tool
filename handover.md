@@ -1,7 +1,7 @@
 # Handover — sesión de brainstorming TFM RAG Platform
 
-**Última actualización:** 2026-05-25, sesión 9 (plan #17 EVAL-RAGAS **CERRADO** — Tasks 5 CLI + 6 integration e2e + cleanup landed. 173 unit tests passing, **29 integration tests passing** contra stack vivo. **13/17 plans tagged**. Tag `cap-17-eval-ragas` → `9e20cf6`).
-**Continuación:** abrir cualquiera de los 4 plans pendientes — #9 (KB-DB-SOURCES, M4) → #11 (WIDGET-CONFIG) → #13 (CHAT-SQL-EXECUTION, cierra M4) → #16 (WIDGET-RUNTIME, M5). Todos ortogonales a la demo M3+M6 ya operativa.
+**Última actualización:** 2026-05-25, sesión 10 (plan #9 KB-DB-SOURCES **CERRADO** — 7 tasks landed + compose mysql + e2e. **206 unit tests passing**, 35/36 integration green (1 flake pre-existente). **14/17 plans tagged**. Tag `cap-09-kb-db-sources` → `3ec7b13`).
+**Continuación:** abrir cualquiera de los 3 plans pendientes — #11 (WIDGET-CONFIG) → #13 (CHAT-SQL-EXECUTION, cierra M4 sumando query_database al loop, depende del #9 ya en main) → #16 (WIDGET-RUNTIME, M5). Todos ortogonales a la demo M3+M6 ya operativa.
 
 Este documento es el punto de entrada para retomar el trabajo. Si lo estás leyendo en una sesión nueva: empieza aquí, no por el `.log`.
 
@@ -262,11 +262,11 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 
 ## 8. Cómo continuar en la próxima sesión
 
-### Estado actual al cierre de sesión 9
+### Estado actual al cierre de sesión 10
 
 **Rama:** `feat/cap-01-infra-persistence` (todo en una rama; cuando se quiera abrir PRs por CAP se rebasarán en branches separadas).
 
-**Plans implementados (13/17 con tag):**
+**Plans implementados (14/17 con tag):**
 | # | CAP | Tag | Estado |
 |---|---|---|---|
 | 01 | CAP-INFRA-PERSISTENCE | `cap-01-infra-persistence` | ✅ |
@@ -277,6 +277,7 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 | 06 | CAP-INTEG-CREDENTIALS | `cap-06-integ-credentials` | ✅ |
 | 07 | CAP-KB-LIFECYCLE | `cap-07-kb-lifecycle` | ✅ |
 | 08 | CAP-KB-DOC-SOURCES | `cap-08-kb-doc-sources` | ✅ (MVP: upload + PDF/TXT + Ollama + fixed_size) |
+| 09 | CAP-KB-DB-SOURCES | `cap-09-kb-db-sources` | ✅ (postgres + mysql adapters via asyncpg/asyncmy + test + introspect + encrypted credentials in payload) |
 | 10 | CAP-CHATBOT-LIFECYCLE | `cap-10-chatbot-lifecycle` | ✅ (CRUD + N:M + RESTRICT FK + embedding compat) |
 | 12 | CAP-CHAT-DOC-RETRIEVAL | `cap-12-chat-doc-retrieval` | ✅ (RetrieveDocs + utility endpoint `/search`) |
 | 14 | CAP-CHAT-SESSIONS | `cap-14-chat-sessions` | ✅ (sessions/messages + read endpoints + helpers para #15) |
@@ -298,6 +299,12 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 - `mypy src/` ✅ Success: no issues found in 154 source files (un `type: ignore[index]` huérfano eliminado en el mismo commit).
 - `pytest tests/ -m "not integration"` ✅ **173 passed**, 28 deselected.
 - `pytest tests/integration -m integration` ✅ **29 passed** contra Postgres + Qdrant + Ollama (llama3.1 + bge-m3) en 7m13s. El test e2e de CLI nuevo corre en 4m49s y genera report.json + report.md con 2/2 cases scored y 0 errors.
+
+**Verificación al cierre de sesión 10 (plan #9 cerrado):**
+- `ruff check .` ✅ All checks passed (33 autofixes en cleanup commit `3ec7b13`, mayoría `TimeoutError` builtin alias + UP017 + B904).
+- `mypy src/` ✅ Success: no issues found in **162 source files** (+8 nuevos: connectors postgres/mysql + tester + use case + 2 VOs + port + dispatcher).
+- `pytest tests/ -m "not integration"` ✅ **206 passed**, 36 deselected. Salto desde 173 → 206 (+33 tests nuevos: 10 postgres + 9 mysql + 8 tester + 6 use case).
+- `pytest tests/integration -m integration` ✅ **35 passed / 36** (4 nuevos del endpoint + 3 nuevos del e2e flow). El test fallido `test_register_then_login_then_me_flow` es flake pre-existente por contaminación de event loop entre tests (pasa en aislamiento; verificado por subagent Task 7). No introducido por #9.
 
 **Bugs reales encontrados y arreglados en sesión 6:**
 - **`bootstrap_tenant` FK ordering** (commit `e21c658`): SQLAlchemy no detecta la dependencia de INSERT entre `TenantRow` y `ProviderCredentialRow` sin un `relationship()` declarado, así que emitía el credential primero → `ForeignKeyViolationError`. Fix: flush intermedio entre `session.add(tenant)` y `session.add(credential)`. Lo descubrieron los integration tests en cuanto Docker estuvo arriba — los unit tests no lo cogieron porque mockean el repo.
@@ -323,7 +330,7 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 - **`python-multipart>=0.0.9`** añadido en plan #8 como dep (lo requiere FastAPI para `File`/`Form` uploads).
 - **Scripts de bootstrap creados (sesión 6):** `scripts/setup.sh` (instalación idempotente en PC nuevo) + `scripts/run-backend.sh` (arrancar uvicorn con las env vars correctas). README en raíz reescrito como entry point completo.
 
-**Plans pendientes (4/17):** #9 KB-DB-SOURCES (M4) → #11 CHATBOT-WIDGET-CONFIG → #13 CHAT-SQL-EXECUTION → #16 WIDGET-RUNTIME. Todos ortogonales a la demo M3 ya operativa. **Pieza académica (#17) cerrada.**
+**Plans pendientes (3/17):** #11 CHATBOT-WIDGET-CONFIG → #13 CHAT-SQL-EXECUTION (cierra M4 con `query_database` tool en el agent loop; depende de #9 que ya está en main) → #16 WIDGET-RUNTIME (M5). **Pieza académica (#17) cerrada. M4 backend listo, falta el tool que lo expone al agent loop (#13).**
 
 ### Workflow de ejecución acordado con el usuario
 
@@ -335,6 +342,31 @@ Para minimizar interrupciones (confirmado y validado en sesión 6):
 - Cada subagent puede dejar dudas en `subagent-questions.md` (formato en cabecera). El controller cierra las dudas al final del plan con respuesta `✅ Aceptada`.
 
 ### Próximo paso concreto en la siguiente sesión
+
+**Estado al cierre de sesión 10: plan #9 (KB-DB-SOURCES) CERRADO — 7/7 tasks committed, tag movido a cleanup.**
+
+Commits del plan #9 (en orden):
+- `be650c4` docs(plan): plan #9 — CAP-KB-DB-SOURCES (7 tasks)
+- `9be1238` feat(domain): Task 1 — DatabaseConnector port + DB source VOs (DatabaseSourceSpec, ColumnSchema, TableSchema, DatabaseSchemaSnapshot) + 3 errors (`DatabaseConnectionError`, `SchemaIntrospectionError`, `UnsupportedDatabaseDialectError`) + asyncmy>=0.2.10 dep
+- `7782457` feat(adapters): Task 2 — PostgresConnector (asyncpg) test + introspect (10 unit tests con asyncpg monkey-patched)
+- `3a887c9` feat(adapters): Task 3 — MySQLConnector (asyncmy) test + introspect (9 unit tests)
+- `eec57c6` feat(adapters): Task 4 — DatabaseSourceTester dispatches by driver + auto-registra tester para type='database' (8 unit tests)
+- `c16be60` feat(app): Task 5 — attach_database_source use case (validar KB → test → introspect → encrypt password → persist source row + 6 unit tests). **Nota**: el helper `_kb()` del test añadió `description=None, created_at=_NOW, updated_at=_NOW` (la entidad real los exige; el plan los omitía).
+- `7641002` feat(api): Task 6 — `POST /api/knowledge-bases/{kb_id}/sources/databases` + Pydantic models + `_KbRepoAdapter` + `_InlineSourcesRepo` + 4 integration endpoint tests. **Adaptaciones**: añadido `except KeyError` defensivo en `DatabaseSourceTester.test()` para specs incompletas (evita 500); actualizado `test_kb_full_lifecycle` (asertaba `TESTER_NOT_REGISTERED` — ya no aplica post-Task 4).
+- `69ae2b4` test(db-source): Task 7 — compose mysql_source service + 3 e2e tests (postgres real attach, mysql real attach, wrong-password→400 sin filtrar el password). **Bug real cazado**: `asyncmy.Connection.close()` es síncrono (no `await`); el plan tenía `await conn.close()` que daba `TypeError`. Arreglado en `mysql.py` + alineado en fakes.
+- `3ec7b13` chore(plan-09): ruff autofix (33 errores: `asyncio.TimeoutError → TimeoutError` builtin alias + UP017 datetime.UTC + B904 `raise ... from`) + alineado fake de unit `test_mysql_connector.py::_FakeConnection.close()` a sync.
+
+**Tag aplicado**: `cap-09-kb-db-sources` → `3ec7b13` (cleanup commit, convención del repo).
+
+**Notas de operación del stack (nuevas en sesión 10):**
+- **MySQL container añadido a compose**: `tfm-rag-mysql_source-1` en port 3306. Volumen `mysql_source_data`. Variables `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` en `.env`. Healthcheck con `mysqladmin ping`. Primera inicialización ~30-40s.
+- **Postgres del compose hospeda DB secundaria** `tfm_rag_source_test` (creada por el test prep) para que la app pueda introspeccionarla como DatabaseSource externa. La DB principal del backend sigue siendo `tfm_rag`.
+- **Docker arrancable desde WSL**: `"/mnt/c/Program Files/Docker/Docker/Docker Desktop.exe" &` y esperar ~20s. Los containers se levantan solos si ya existían. Para comandos en runtime usar `docker.exe ...` (el binario Windows funciona vía WSL).
+- **asyncmy quirk**: `Connection.close()` es **síncrono**, devuelve `None`, no es coroutine. NO `await`. (Bug descubierto en sesión 10.)
+
+---
+
+### Estado anterior — sesión 9 (plan #17 cerrado)
 
 **Estado al cierre de sesión 9: plan #17 (EVAL-RAGAS) CERRADO — 6/6 tasks committed, tag movido.**
 
@@ -365,7 +397,7 @@ Pasos al retomar:
 ### Pendientes / riesgos conocidos
 
 - **Docker WSL2 operativo** — `docker compose up -d postgres qdrant ollama` desde `infra/` funciona. Ollama image (~3.86 GB) descargada y volúmenes persistentes.
-- **Tags movidos tras cleanup (convención consolidada)** — todos los `cap-NN-*` apuntan al commit `chore(plan-NN): ruff autofix` final, no al `feat:` original. Última secuencia: cap-07 → e56950c, cap-08 → f545631, cap-10 → c23e5e4, cap-12 → c9aa7c2, cap-14 → db689b5, cap-15 → 226db16. **Excepción `cap-17` → `9e20cf6` (Task 6 e2e)**: cleanup se hizo antes de Task 6 (Docker caído al empezar la sesión), y el tag apunta al último commit del plan, no al cleanup. Sin impacto funcional.
+- **Tags movidos tras cleanup (convención consolidada)** — todos los `cap-NN-*` apuntan al commit `chore(plan-NN): ruff autofix` final, no al `feat:` original. Última secuencia: cap-07 → e56950c, cap-08 → f545631, cap-10 → c23e5e4, cap-12 → c9aa7c2, cap-14 → db689b5, cap-15 → 226db16, **cap-09 → 3ec7b13**. **Excepción `cap-17` → `9e20cf6` (Task 6 e2e)**: cleanup se hizo antes de Task 6 (Docker caído al empezar la sesión 9), y el tag apunta al último commit del plan, no al cleanup. Sin impacto funcional.
 - **Branch `feat/cap-01-infra-persistence`** acumula 11 CAPs. Cuando se quiera abrir PRs separadas, rebasear en branches por tag.
 - **`_session_factory` global** en `infrastructure/api/dependencies.py` — sigue pendiente el refactor a `app.state.session_factory` en lifespan FastAPI. Cada vez que un test de integración nuevo toca routers necesita resetearlo en su fixture.
 - **Qdrant client 1.18.0 vs server 1.12.0** — warning en cada llamada; no bloqueante. La librería ya migró internamente de `.search()` a `.query_points()` (visto en plan #12).
@@ -396,6 +428,7 @@ GET    /api/knowledge-bases/{kb_id}/sources
 DELETE /api/knowledge-bases/{kb_id}/sources/{source_id}
 POST   /api/knowledge-bases/{kb_id}/sources/test-connection
 POST   /api/knowledge-bases/{kb_id}/sources/documents     (multipart upload)
+POST   /api/knowledge-bases/{kb_id}/sources/databases     (plan #9 — attach SQL DB)
 POST   /api/knowledge-bases/{kb_id}/sources/{src_id}/reindex
 POST   /api/knowledge-bases/{kb_id}/search                (plan #12 — busca chunks)
 GET    /api/ingestion-jobs/{job_id}
@@ -449,16 +482,16 @@ curl -X POST http://localhost:8000/api/auth/register \
 ```
 #1-#7  [completed] Diseño (15 secciones HTML + 10 preguntas
                    respondidas + writing-plans invocado)
-#8     [in_progress] Escribir + implementar 17 plans (13/17 hechos)
+#8     [in_progress] Escribir + implementar 17 plans (14/17 hechos)
                      ✅ Plans 01-06 (M1 cerrado, todos tagged + E2E verificado)
-                     ✅ Plans 07-08 (M2 demo MVP — KB CRUD + ingestion + Qdrant)
+                     ✅ Plans 07-08-09 (M2 + M4-backend — KB CRUD + ingestion + Qdrant + DB attach)
                      ✅ Plans 10, 12, 14, 15 (M3 CERRADO — chatbots + retrieval + sessions + agent loop)
                      ✅ Plan 17 (M6 RAGAS eval CERRADO — VOs + RagasEvaluator + CLI + e2e test)
-                     ⏳ Plans 09, 11, 13, 16 (M4-M7, ortogonales a la demo principal)
+                     ⏳ Plans 11, 13, 16 (M5 widget, M4 query tool, M5 widget runtime — ortogonales)
 #9     [completed]   Ejecutar integration tests con Docker disponible
-                     (12/12 → 17/17 → 20/20 → 25/25 → 28/28 → 29/29 — sesión 9)
+                     (12/12 → 17/17 → 20/20 → 25/25 → 28/28 → 29/29 → 35/36 — sesión 10)
 #10    [pending]     PR(s) — decidir si uno por CAP o uno por M
 #11    [completed]   Bootstrap scripts + README + run-backend.sh (sesión 6)
 ```
 
-Estado actual: en pausa para handover. **M3 demo + M6 eval académica operativas**: la siguiente sesión puede iniciar cualquiera de los 4 plans pendientes (#9, #11, #13, #16).
+Estado actual: en pausa para handover. **M3 demo + M6 eval académica operativas + M4 backend listo**: la siguiente sesión puede iniciar cualquiera de los 3 plans pendientes (#11, #13, #16). **#13 es el natural "siguiente" porque expone el DatabaseSource ya soportado por la API al agent loop del chatbot, cerrando M4 funcional**.

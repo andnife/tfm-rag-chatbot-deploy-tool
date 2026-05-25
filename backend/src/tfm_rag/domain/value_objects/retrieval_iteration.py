@@ -19,6 +19,9 @@ class RetrievalIteration:
     query: str | None
     num_chunks: int | None
     latency_ms: float
+    # plan #13 — populated only for query_database iterations
+    sql: str | None = None
+    row_count: int | None = None
 
     def __post_init__(self) -> None:
         if self.index < 0:
@@ -41,6 +44,8 @@ class RetrievalIteration:
             "query": self.query,
             "num_chunks": self.num_chunks,
             "latency_ms": self.latency_ms,
+            "sql": self.sql,
+            "row_count": self.row_count,
         }
 
     @classmethod
@@ -49,10 +54,10 @@ class RetrievalIteration:
             index=int(data["index"]),
             tool=str(data["tool"]),
             query=(str(data["query"]) if data.get("query") is not None else None),
-            num_chunks=(
-                int(data["num_chunks"]) if data.get("num_chunks") is not None else None
-            ),
+            num_chunks=(int(data["num_chunks"]) if data.get("num_chunks") is not None else None),
             latency_ms=float(data["latency_ms"]),
+            sql=(str(data["sql"]) if data.get("sql") is not None else None),
+            row_count=(int(data["row_count"]) if data.get("row_count") is not None else None),
         )
 
 

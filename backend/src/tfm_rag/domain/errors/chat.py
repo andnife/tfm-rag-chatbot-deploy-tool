@@ -35,3 +35,23 @@ class MaxIterationsExceededError(DomainError):
     a terminal decision. The use case actually CATCHES this and synthesises
     an abstain — but it's defined here so tests can pin the behaviour.
     """
+
+
+class UnsafeSQLError(DomainError):
+    """Raised when the LLM emits SQL that the safety checker rejects
+    (non-SELECT statement, multi-statement, banned keyword)."""
+
+
+class QueryExecutionError(DomainError):
+    """Raised when the database returns an error executing the SELECT
+    (syntax, missing table, permission denied, server crash).
+
+    Connection-level failures (auth, network) keep raising
+    DatabaseConnectionError from domain.errors.knowledge instead.
+    """
+
+
+class DatabaseSourceMismatchError(DomainError):
+    """Raised when the agent emits a query_database call with a
+    source_id that does not exist in the chatbot's attached KBs, or
+    points to a non-database Source."""

@@ -224,3 +224,176 @@ async def test_introspect_schema_query_failure_raises_schema_introspection_error
         await MySQLConnector().introspect_schema(_spec())
 
     assert "denied" in str(exc_info.value).lower() or "1142" in str(exc_info.value)
+
+
+# --- run_select ---------------------------------------------------------------
+
+
+class _RunSelectCursor:
+    """Cursor variant that also exposes asyncmy's `description` attribute
+    after `execute`, so we can read column names."""
+
+    def __init__(
+        self, rows: list[tuple[Any, ...]], description: list[tuple[str, ...]]
+    ) -> None:
+        self._rows = rows
+        self._description = description
+        self.queries: list[str] = []
+
+    async def execute(self, query: str, *_args: Any) -> None:
+        self.queries.append(query)
+
+    @property
+    def description(self) -> list[tuple[str, ...]]:
+        return self._description
+
+    async def fetchall(self) -> list[tuple[Any, ...]]:
+        return self._rows
+
+    async def close(self) -> None:
+        pass
+
+    async def __aenter__(self) -> "_RunSelectCursor":
+        return self
+
+    async def __aexit__(self, *_exc: Any) -> None:
+        await self.close()
+
+
+class _RunSelectConnection:
+    def __init__(
+        self, rows: list[tuple[Any, ...]], description: list[tuple[str, ...]]
+    ) -> None:
+        self._rows = rows
+        self._description = description
+        self.closed = False
+
+    def cursor(self) -> _RunSelectCursor:
+        return _RunSelectCursor(self._rows, self._description)
+
+    def close(self) -> None:
+        # asyncmy.Connection.close() is synchronous.
+        self.closed = True
+
+
+def _patch_connect_run_select(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    fake_conn: _RunSelectConnection | None = None,
+    raise_exc: BaseException | None = None,
+) -> dict[str, Any]:
+    captured: dict[str, Any] = {}
+
+    async def _fake_connect(**kwargs: Any) -> _RunSelectConnection:
+        captured.update(kwargs)
+        if raise_exc is not None:
+            raise raise_exc
+        assert fake_conn is not None
+        return fake_conn
+
+    import asyncmy
+    monkeypatch.setattr(asyncmy, "connect", _fake_connect)
+    return captured
+
+
+async def test_run_select_returns_columns_and_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [(1, "alice"), (2, "bob")]
+    description = [("id",), ("name",)]
+    conn = _RunSelectConnection(rows, description)
+    _patch_connect_run_select(monkeypatch, fake_conn=conn)
+
+    result = await MySQLConnector().run_select(
+        _spec(), "SELECT id, name FROM users", row_limit=10
+    )
+
+    assert result.columns == ("id", "name")
+    assert result.row_count == 2
+    assert result.rows[0] == {"id": 1, "name": "alice"}
+    assert result.truncated is False
+    assert conn.closed is True
+
+
+async def test_run_select_truncates_when_db_returns_extra(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [(i,) for i in range(4)]
+    description = [("i",)]
+    conn = _RunSelectConnection(rows, description)
+    _patch_connect_run_select(monkeypatch, fake_conn=conn)
+
+    result = await MySQLConnector().run_select(
+        _spec(), "SELECT i FROM t", row_limit=3
+    )
+
+    assert result.row_count == 3
+    assert [r["i"] for r in result.rows] == [0, 1, 2]
+    assert result.truncated is True
+
+
+async def test_run_select_stringifies_uuid_and_datetime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import datetime as _dt
+    from uuid import UUID
+
+    rows = [(
+        UUID("11111111-2222-3333-4444-555555555555"),
+        _dt.datetime(2026, 5, 25, 12, 0, tzinfo=_dt.timezone.utc),
+        None,
+    )]
+    description = [("id",), ("ts",), ("n",)]
+    conn = _RunSelectConnection(rows, description)
+    _patch_connect_run_select(monkeypatch, fake_conn=conn)
+
+    result = await MySQLConnector().run_select(
+        _spec(), "SELECT id, ts, n FROM t", row_limit=10
+    )
+
+    assert isinstance(result.rows[0]["id"], str)
+    assert "2026-05-25" in result.rows[0]["ts"]
+    assert result.rows[0]["n"] is None
+
+
+async def test_run_select_empty_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conn = _RunSelectConnection([], [])
+    _patch_connect_run_select(monkeypatch, fake_conn=conn)
+
+    result = await MySQLConnector().run_select(
+        _spec(), "SELECT 1 WHERE FALSE", row_limit=10
+    )
+
+    assert result.row_count == 0
+    assert result.columns == ()
+    assert result.truncated is False
+
+
+async def test_run_select_query_error_raises_query_execution_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncmy.errors
+
+    from tfm_rag.domain.errors.chat import QueryExecutionError
+
+    class _FailingCursor(_RunSelectCursor):
+        async def execute(self, query: str, *args: Any) -> None:
+            raise asyncmy.errors.ProgrammingError(
+                1146, "Table 'shop.nope' doesn't exist"
+            )
+
+    class _Conn(_RunSelectConnection):
+        def cursor(self) -> _RunSelectCursor:
+            return _FailingCursor([], [])
+
+    conn = _Conn([], [])
+    _patch_connect_run_select(monkeypatch, fake_conn=conn)
+
+    with pytest.raises(QueryExecutionError) as exc_info:
+        await MySQLConnector().run_select(
+            _spec(), "SELECT * FROM nope", row_limit=10
+        )
+    assert "doesn't exist" in str(exc_info.value).lower() or "1146" in str(exc_info.value)
+    assert conn.closed is True

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
@@ -17,6 +17,10 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tfm_rag.application.chat.retrieve_docs import retrieve_docs
+from tfm_rag.application.knowledge.attach_database_source import (
+    AttachDatabaseResult,
+    attach_database_source,
+)
 from tfm_rag.application.knowledge.attach_document_source import (
     attach_document_source,
 )
@@ -48,10 +52,16 @@ from tfm_rag.domain.entities.source import SourceType
 from tfm_rag.domain.errors.chat import UnsupportedProviderError
 from tfm_rag.domain.errors.common import ValidationError
 from tfm_rag.domain.errors.knowledge import (
+    DatabaseConnectionError,
     IncompatibleEmbeddingsError,
     KnowledgeBaseInUseError,
     KnowledgeBaseNotFoundError,
+    SchemaIntrospectionError,
     SourceNotFoundError,
+    UnsupportedDatabaseDialectError,
+)
+from tfm_rag.domain.value_objects.database_source_spec import (
+    DatabaseSourceSpec,
 )
 from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
@@ -60,6 +70,12 @@ from tfm_rag.infrastructure.api.dependencies import (
     _get_factory,  # noqa: PLC2701
     get_current_context,
     get_session,
+)
+from tfm_rag.infrastructure.database_connectors.source_tester import (
+    DATABASE_CONNECTORS,
+)
+from tfm_rag.infrastructure.secrets.fernet_encryptor import (
+    FernetSecretEncryptor,
 )
 from tfm_rag.infrastructure.chunkers.fixed_size import FixedSizeChunker
 from tfm_rag.infrastructure.document_loaders.dispatcher import LoaderDispatcher
@@ -540,6 +556,111 @@ async def upload_document_(
     runner.schedule(_kick)
 
     return UploadDocOut(source_id=str(result.source_id), job_id=str(job_id))
+
+
+class AttachDatabaseIn(BaseModel):
+    driver: Literal["postgres", "mysql"]
+    host: str
+    port: int = Field(..., ge=1, le=65535)
+    db_name: str
+    username: str
+    password: str
+    ssl_mode: Literal["disable", "require"] = "disable"
+
+
+class AttachDatabaseOut(BaseModel):
+    source_id: str
+    snapshot_tables: int
+    snapshot_captured_at: datetime
+
+
+class _KbRepoAdapter:
+    """Wraps the existing get_knowledge_base use case as a kb_repo for
+    attach_database_source. Lives inline in the router to avoid introducing
+    a new repository abstraction in the persistence layer."""
+
+    def __init__(self, session: AsyncSession, ctx: RequestContext) -> None:
+        self._session = session
+        self._ctx = ctx
+
+    async def get(self, kb_id: UUID) -> Any:
+        return await get_knowledge_base(self._session, self._ctx, kb_id=kb_id)
+
+
+class _InlineSourcesRepo:
+    """Tiny adapter so the use case can `insert_database_source` via the
+    request-scoped session. Mirrors the inline persistence pattern used in
+    `attach_document_source`."""
+
+    def __init__(
+        self, session: AsyncSession, ctx: RequestContext
+    ) -> None:
+        self._session = session
+        self._ctx = ctx
+
+    async def insert_database_source(
+        self, *, kb_id: UUID, payload: dict[str, Any]
+    ) -> UUID:
+        source_id = uuid4()
+        self._session.add(
+            SourceRow(
+                id=source_id,
+                kb_id=kb_id,
+                type="database",
+                payload=payload,
+                ingest_status="done",
+                last_ingest_at=datetime.now(timezone.utc),
+            )
+        )
+        return source_id
+
+
+@router.post(
+    "/{kb_id}/sources/databases",
+    status_code=201,
+    response_model=AttachDatabaseOut,
+)
+async def attach_database_source_(
+    kb_id: UUID,
+    body: AttachDatabaseIn,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    ctx: RequestContext = Depends(get_current_context),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> AttachDatabaseOut:
+    spec = DatabaseSourceSpec(
+        driver=body.driver,
+        host=body.host,
+        port=body.port,
+        db_name=body.db_name,
+        username=body.username,
+        password=body.password,
+        ssl_mode=body.ssl_mode,
+    )
+    encryptor = FernetSecretEncryptor(settings.fernet_key)
+    kb_repo = _KbRepoAdapter(session, ctx)
+    sources_repo = _InlineSourcesRepo(session, ctx)
+    try:
+        result: AttachDatabaseResult = await attach_database_source(
+            session=session,
+            kb_repo=kb_repo,
+            sources_repo=sources_repo,
+            kb_id=kb_id,
+            spec=spec,
+            encryptor=encryptor,
+            connectors=DATABASE_CONNECTORS,
+        )
+    except KnowledgeBaseNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnsupportedDatabaseDialectError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except (DatabaseConnectionError, SchemaIntrospectionError) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return AttachDatabaseOut(
+        source_id=str(result.source_id),
+        snapshot_tables=result.snapshot_table_count,
+        snapshot_captured_at=result.snapshot_captured_at,
+    )
 
 
 @router.post(

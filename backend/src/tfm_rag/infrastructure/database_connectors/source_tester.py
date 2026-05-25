@@ -56,6 +56,11 @@ class DatabaseSourceTester:
             await connector.test_connection(spec)
         except DatabaseConnectionError as exc:
             return SourceConnectionTestResult(ok=False, error=str(exc))
+        except KeyError as exc:
+            return SourceConnectionTestResult(
+                ok=False,
+                error=f"missing required connection field: {exc}",
+            )
         return SourceConnectionTestResult(
             ok=True, error=None, details={"driver": driver}
         )

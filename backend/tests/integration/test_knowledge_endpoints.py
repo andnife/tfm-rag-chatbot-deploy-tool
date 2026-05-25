@@ -138,7 +138,8 @@ async def test_kb_full_lifecycle(_clean_kb_tables: None) -> None:
         assert srcs.status_code == 200
         assert srcs.json() == []
 
-        # Test-connection — no tester registered yet
+        # Test-connection — database tester is registered; incomplete spec
+        # returns ok=False (no host provided, connection attempt fails).
         tc = await client.post(
             f"/api/knowledge-bases/{kb_id}/sources/test-connection",
             headers=h,
@@ -146,7 +147,6 @@ async def test_kb_full_lifecycle(_clean_kb_tables: None) -> None:
         )
         assert tc.status_code == 200
         assert tc.json()["ok"] is False
-        assert "TESTER_NOT_REGISTERED" in tc.json()["error"]
 
         # Delete KB
         deleted = await client.delete(

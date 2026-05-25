@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -105,6 +105,41 @@ class PipelineConfigIn(BaseModel):
         )
 
 
+class WidgetConfigIn(BaseModel):
+    theme: Literal["light", "dark"] = "light"
+    primary_color: str = "#3b82f6"
+    position: Literal["bottom-right", "bottom-left"] = "bottom-right"
+    title: str = Field(default="Asistente", min_length=1, max_length=60)
+    welcome_message: str = Field(
+        default="¿En qué puedo ayudarte?", min_length=1, max_length=500
+    )
+    placeholder: str = Field(
+        default="Escribe tu pregunta...", min_length=1, max_length=100
+    )
+    allowed_origins: list[str] = Field(default_factory=list, max_length=50)
+
+    def to_domain(self) -> "WidgetConfig":
+        from tfm_rag.domain.value_objects.widget_config import WidgetConfig
+        return WidgetConfig.from_dict(self.model_dump())
+
+
+class WidgetConfigOut(BaseModel):
+    theme: str
+    primary_color: str
+    position: str
+    title: str
+    welcome_message: str
+    placeholder: str
+    allowed_origins: list[str]
+
+    @classmethod
+    def from_domain(cls, raw: dict[str, Any]) -> "WidgetConfigOut":
+        from tfm_rag.domain.value_objects.widget_config import WidgetConfig
+        # Use VO's tolerant from_dict so legacy partial rows still work.
+        vo = WidgetConfig.from_dict(raw or {})
+        return cls(**vo.to_dict())
+
+
 class CreateChatbotIn(BaseModel):
     name: str
     description: str | None = None
@@ -112,7 +147,7 @@ class CreateChatbotIn(BaseModel):
     llm_selection: LLMSelectionIn
     kb_ids: list[UUID] = Field(default_factory=list)
     pipeline_config: PipelineConfigIn = Field(default_factory=PipelineConfigIn)
-    widget_config: dict[str, Any] = Field(default_factory=dict)
+    widget_config: WidgetConfigIn = Field(default_factory=WidgetConfigIn)
 
 
 class UpdateChatbotIn(BaseModel):
@@ -122,7 +157,7 @@ class UpdateChatbotIn(BaseModel):
     llm_selection: LLMSelectionIn | None = None
     kb_ids: list[UUID] | None = None
     pipeline_config: PipelineConfigIn | None = None
-    widget_config: dict[str, Any] | None = None
+    widget_config: WidgetConfigIn | None = None
 
 
 # --- Output models ----------------------------------------------------------
@@ -135,8 +170,9 @@ class ChatbotOut(BaseModel):
     system_prompt: str
     llm_selection: dict[str, Any]
     pipeline_config: dict[str, Any]
-    widget_config: dict[str, Any]
+    widget_config: WidgetConfigOut
     kb_ids: list[str]
+    public_key: str
 
     @classmethod
     def from_view(cls, v: ChatbotView) -> "ChatbotOut":
@@ -148,8 +184,9 @@ class ChatbotOut(BaseModel):
             system_prompt=v.system_prompt,
             llm_selection=v.llm_selection.to_dict(),
             pipeline_config=v.pipeline_config.to_dict(),
-            widget_config=v.widget_config,
+            widget_config=WidgetConfigOut.from_domain(v.widget_config),
             kb_ids=[str(i) for i in v.kb_ids],
+            public_key=v.public_key,
         )
 
 
@@ -170,7 +207,7 @@ async def create_(
             llm_selection=body.llm_selection.to_vo(),
             kb_ids=body.kb_ids,
             pipeline_config=body.pipeline_config.to_vo(),
-            widget_config=body.widget_config,
+            widget_config=body.widget_config.to_domain(),
         )
     except ChatbotAlreadyExistsError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -224,7 +261,7 @@ async def patch_(
             llm_selection=body.llm_selection.to_vo() if body.llm_selection else None,
             kb_ids=body.kb_ids,
             pipeline_config=body.pipeline_config.to_vo() if body.pipeline_config else None,
-            widget_config=body.widget_config,
+            widget_config=body.widget_config.to_domain() if body.widget_config is not None else None,
         )
     except ChatbotNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

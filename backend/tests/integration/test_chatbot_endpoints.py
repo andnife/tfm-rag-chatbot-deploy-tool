@@ -289,3 +289,55 @@ async def test_chatbot_isolation_between_tenants(_clean_state: None) -> None:
             headers={"Authorization": f"Bearer {bob_token}"},
         )
         assert r.status_code == 404
+
+
+@pytest.mark.integration
+async def test_public_key_generated_and_immutable(_clean_state: None) -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        token, _ = await _register(c, "widget-test@example.com")
+        h = {"Authorization": f"Bearer {token}"}
+        cred_id = await _ollama_cred_id(c, token)
+
+        # Create a chatbot — no widget_config sent (relies on defaults)
+        r = await c.post(
+            "/api/chatbots",
+            headers=h,
+            json={
+                "name": "PublicKeyBot",
+                "system_prompt": "be brief",
+                "llm_selection": {
+                    "provider_id": "ollama",
+                    "credential_id": cred_id,
+                    "model_id": "llama3.1",
+                },
+                "kb_ids": [],
+            },
+        )
+        assert r.status_code == 201, r.text
+        body = r.json()
+        chatbot_id = body["id"]
+        public_key = body["public_key"]
+        assert isinstance(public_key, str)
+        assert public_key.startswith("wgt_")
+        assert len(public_key) > 10
+
+        # GET returns the same public_key
+        r2 = await c.get(f"/api/chatbots/{chatbot_id}", headers=h)
+        assert r2.status_code == 200, r2.text
+        assert r2.json()["public_key"] == public_key
+
+        # PATCH with a "public_key" in the body — server should either reject
+        # (422) or silently ignore it; either way the stored key must not change.
+        r3 = await c.patch(
+            f"/api/chatbots/{chatbot_id}",
+            headers=h,
+            json={"public_key": "wgt_attacker"},
+        )
+        # 422 (extra field rejected) or 200 (ignored) are both acceptable.
+        assert r3.status_code in (200, 422), r3.text
+
+        # Re-read: public_key must be unchanged.
+        r4 = await c.get(f"/api/chatbots/{chatbot_id}", headers=h)
+        assert r4.status_code == 200, r4.text
+        assert r4.json()["public_key"] == public_key

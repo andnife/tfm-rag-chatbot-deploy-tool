@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -12,7 +12,7 @@ from tfm_rag.domain.value_objects.evaluation_report import (
 
 
 def _report(cases: list[EvaluationCase]) -> EvaluationReport:
-    when = datetime(2026, 5, 24, 10, 0, tzinfo=timezone.utc)
+    when = datetime(2026, 5, 24, 10, 0, tzinfo=UTC)
     return EvaluationReport(
         chatbot_id=uuid4(),
         chatbot_name="HistoryBot",

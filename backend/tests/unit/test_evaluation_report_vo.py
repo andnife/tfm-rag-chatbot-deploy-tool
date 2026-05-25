@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from tfm_rag.domain.value_objects.evaluation_case import EvaluationCase
@@ -50,7 +50,7 @@ def test_summary_with_no_scored_cases_yields_empty_metrics() -> None:
 
 def test_report_to_dict_contains_config_and_cases() -> None:
     chatbot_id = uuid4()
-    when = datetime(2026, 5, 24, 10, 0, tzinfo=timezone.utc)
+    when = datetime(2026, 5, 24, 10, 0, tzinfo=UTC)
     cases = [_case()]
     report = EvaluationReport(
         chatbot_id=chatbot_id,
@@ -84,8 +84,8 @@ def test_report_top_failures_returns_worst_cases_per_metric() -> None:
         chatbot_name="X",
         dataset_path="/tmp/ds.jsonl",
         scenario_filter=None,
-        run_started_at=datetime.now(timezone.utc),
-        run_finished_at=datetime.now(timezone.utc),
+        run_started_at=datetime.now(UTC),
+        run_finished_at=datetime.now(UTC),
         ragas_judge_model="llama3.1",
         cases=[good, bad, worse],
         summary=EvaluationSummary.from_cases([good, bad, worse]),

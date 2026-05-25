@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tfm_rag.application.chat.answer_query import (
     AnswerView,
+)
+from tfm_rag.application.chat.answer_query import (
     answer_query as _real_answer_query,
 )
 from tfm_rag.application.evaluation.dataset_loader import (
@@ -90,7 +92,7 @@ async def run_ragas_evaluation(
             f"{scenario_filter!r}"
         )
 
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     total = len(cases)
 
     # --- Step 3: run each case ---
@@ -129,7 +131,7 @@ async def run_ragas_evaluation(
             case.scores = scores
 
     # --- Step 5: build report ---
-    finished_at = datetime.now(timezone.utc)
+    finished_at = datetime.now(UTC)
     summary = EvaluationSummary.from_cases(cases)
     report = EvaluationReport(
         chatbot_id=chatbot_id,

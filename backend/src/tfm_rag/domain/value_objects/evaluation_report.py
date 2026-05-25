@@ -31,7 +31,7 @@ class EvaluationSummary:
                 metric_names.update(c.scores.keys())  # type: ignore[union-attr]
             for name in metric_names:
                 vals = [
-                    c.scores[name]  # type: ignore[index]
+                    c.scores[name]
                     for c in scored
                     if c.scores and name in c.scores
                 ]

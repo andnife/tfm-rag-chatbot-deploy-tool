@@ -9,7 +9,7 @@ import argparse
 import asyncio
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -97,7 +97,7 @@ def _print_progress(idx: int, total: int, status: str) -> None:
 async def _run(args: argparse.Namespace) -> int:
     settings = get_settings()
     output_dir = args.output_dir or Path(
-        f"eval_runs/{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+        f"eval_runs/{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     )
 
     engine = build_engine(settings.postgres_url)

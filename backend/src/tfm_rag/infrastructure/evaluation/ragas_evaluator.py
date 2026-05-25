@@ -20,8 +20,8 @@ from typing import Any
 
 from langchain_ollama import OllamaEmbeddings, OllamaLLM
 from ragas import EvaluationDataset, evaluate
-from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import (
     answer_relevancy,
     context_precision,

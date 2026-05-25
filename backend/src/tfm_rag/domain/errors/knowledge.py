@@ -34,3 +34,24 @@ class IngestionFailedError(DomainError):
 
 class IngestionJobNotFoundError(NotFoundError):
     """Raised when an IngestionJob row does not exist in the tenant."""
+
+
+class DatabaseConnectionError(DomainError):
+    """Raised when a connection to a DatabaseSource fails (bad host/port,
+    auth failure, network timeout, SSL failure, etc.).
+
+    The error message is safe to surface to the user (no secrets).
+    """
+
+
+class SchemaIntrospectionError(DomainError):
+    """Raised when introspecting the schema of a DatabaseSource fails
+    after a successful connection (e.g. missing permissions on
+    information_schema, unexpected dialect quirk).
+    """
+
+
+class UnsupportedDatabaseDialectError(DomainError):
+    """Raised when a DatabaseSourceSpec specifies a driver value we don't
+    support (anything other than 'postgres' or 'mysql' in MVP).
+    """

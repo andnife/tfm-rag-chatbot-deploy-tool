@@ -226,3 +226,139 @@ async def test_introspect_schema_query_failure_raises_schema_introspection_error
         await PostgresConnector().introspect_schema(_spec())
 
     assert "permission" in str(exc_info.value).lower()
+
+
+# --- run_select ---------------------------------------------------------------
+
+
+async def test_run_select_returns_columns_and_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [
+        {"id": 1, "email": "a@x"},
+        {"id": 2, "email": "b@x"},
+    ]
+    # The connector emits `SELECT id, email FROM users LIMIT N+1`. The fake
+    # echoes back whatever rows were registered for any query.
+    conn = _FakeConnection({})
+    captured_sql: dict[str, str] = {}
+
+    async def _fake_fetch(query: str, *args: Any) -> list[Any]:
+        captured_sql["last"] = query
+        return [_Row(r) for r in rows]
+
+    conn.fetch = _fake_fetch  # type: ignore[method-assign]
+    _patch_connect(monkeypatch, fake_conn=conn)
+
+    result = await PostgresConnector().run_select(
+        _spec(), "SELECT id, email FROM users", row_limit=10
+    )
+
+    assert result.columns == ("id", "email")
+    assert result.row_count == 2
+    assert result.rows[0] == {"id": 1, "email": "a@x"}
+    assert result.truncated is False
+    assert "LIMIT 11" in captured_sql["last"].upper()
+    assert conn.closed is True
+
+
+async def test_run_select_truncates_when_db_returns_extra(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # connector asks for row_limit+1 = 4; fake returns 4 rows → truncated=True
+    rows = [{"i": i} for i in range(4)]
+    conn = _FakeConnection({})
+
+    async def _fake_fetch(query: str, *args: Any) -> list[Any]:
+        return [_Row(r) for r in rows]
+
+    conn.fetch = _fake_fetch  # type: ignore[method-assign]
+    _patch_connect(monkeypatch, fake_conn=conn)
+
+    result = await PostgresConnector().run_select(
+        _spec(), "SELECT i FROM t", row_limit=3
+    )
+
+    assert result.row_count == 3  # trimmed
+    assert [r["i"] for r in result.rows] == [0, 1, 2]
+    assert result.truncated is True
+
+
+async def test_run_select_stringifies_uuid_and_datetime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import datetime as _dt
+    from uuid import UUID
+
+    rows = [{
+        "id": UUID("11111111-2222-3333-4444-555555555555"),
+        "ts": _dt.datetime(2026, 5, 25, 12, 0, tzinfo=_dt.timezone.utc),
+        "n": None,
+    }]
+    conn = _FakeConnection({})
+
+    async def _fake_fetch(query: str, *args: Any) -> list[Any]:
+        return [_Row(r) for r in rows]
+
+    conn.fetch = _fake_fetch  # type: ignore[method-assign]
+    _patch_connect(monkeypatch, fake_conn=conn)
+
+    result = await PostgresConnector().run_select(
+        _spec(), "SELECT id, ts, n FROM t", row_limit=10
+    )
+
+    assert isinstance(result.rows[0]["id"], str)
+    assert result.rows[0]["id"].startswith("11111111-")
+    assert isinstance(result.rows[0]["ts"], str)
+    assert "2026-05-25" in result.rows[0]["ts"]
+    assert result.rows[0]["n"] is None
+
+
+async def test_run_select_empty_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    conn = _FakeConnection({})
+    async def _fake_fetch(query: str, *args: Any) -> list[Any]:
+        return []
+    conn.fetch = _fake_fetch  # type: ignore[method-assign]
+    _patch_connect(monkeypatch, fake_conn=conn)
+
+    result = await PostgresConnector().run_select(
+        _spec(), "SELECT 1 WHERE FALSE", row_limit=10
+    )
+
+    assert result.row_count == 0
+    assert result.columns == ()
+    assert result.truncated is False
+
+
+async def test_run_select_query_error_raises_query_execution_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncpg
+
+    from tfm_rag.domain.errors.chat import QueryExecutionError
+
+    conn = _FakeConnection({})
+    async def _fake_fetch(query: str, *args: Any) -> list[Any]:
+        raise asyncpg.UndefinedTableError(
+            'relation "nope" does not exist'
+        )
+    conn.fetch = _fake_fetch  # type: ignore[method-assign]
+    _patch_connect(monkeypatch, fake_conn=conn)
+
+    with pytest.raises(QueryExecutionError) as exc_info:
+        await PostgresConnector().run_select(
+            _spec(), "SELECT * FROM nope", row_limit=10
+        )
+    assert "nope" in str(exc_info.value).lower()
+    assert conn.closed is True
+
+
+async def test_run_select_connection_failure_raises_database_connection_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_connect(monkeypatch, raise_exc=OSError("no route to host"))
+
+    with pytest.raises(DatabaseConnectionError):
+        await PostgresConnector().run_select(
+            _spec(), "SELECT 1", row_limit=10
+        )

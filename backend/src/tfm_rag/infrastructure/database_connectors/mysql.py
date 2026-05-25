@@ -16,6 +16,7 @@ from tfm_rag.domain.value_objects.database_schema import (
     DatabaseSchemaSnapshot,
     TableSchema,
 )
+from tfm_rag.domain.value_objects.sql_query_result import SqlQueryResult
 
 _INTROSPECT_QUERY = (
     "SELECT table_schema, table_name, column_name, data_type, is_nullable "
@@ -53,6 +54,15 @@ class MySQLConnector(DatabaseConnector):
             captured_at=datetime.now(UTC),
             tables=tables,
         )
+
+    async def run_select(
+        self,
+        spec: dict[str, Any],
+        sql: str,
+        row_limit: int,
+    ) -> SqlQueryResult:
+        # Plan #13 Task 3 will implement this for MySQL.
+        raise NotImplementedError("MySQLConnector.run_select not yet implemented")
 
     async def _connect(self, spec: dict[str, Any]) -> Any:
         ssl_mode = spec.get("ssl_mode", "disable")

@@ -1,7 +1,7 @@
 # Handover — sesión de brainstorming TFM RAG Platform
 
-**Última actualización:** 2026-05-24, sesión 8 (plan #17 EVAL-RAGAS en curso — Tasks 1-4/6 implementadas y commiteadas. Faltan Task 5 CLI + Task 6 integration e2e + cleanup. 159 unit tests passing. 12 plans tagged. Stack Docker vivo durante la sesión).
-**Continuación:** terminar plan #17 (Tasks 5 + 6 + cleanup) o cambiar de plan según prioridad. Stack Docker debe estar arriba para Task 6.
+**Última actualización:** 2026-05-25, sesión 9 (plan #17 EVAL-RAGAS **CERRADO** — Tasks 5 CLI + 6 integration e2e + cleanup landed. 173 unit tests passing, **29 integration tests passing** contra stack vivo. **13/17 plans tagged**. Tag `cap-17-eval-ragas` → `9e20cf6`).
+**Continuación:** abrir cualquiera de los 4 plans pendientes — #9 (KB-DB-SOURCES, M4) → #11 (WIDGET-CONFIG) → #13 (CHAT-SQL-EXECUTION, cierra M4) → #16 (WIDGET-RUNTIME, M5). Todos ortogonales a la demo M3+M6 ya operativa.
 
 Este documento es el punto de entrada para retomar el trabajo. Si lo estás leyendo en una sesión nueva: empieza aquí, no por el `.log`.
 
@@ -262,11 +262,11 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 
 ## 8. Cómo continuar en la próxima sesión
 
-### Estado actual al cierre de sesión 8
+### Estado actual al cierre de sesión 9
 
 **Rama:** `feat/cap-01-infra-persistence` (todo en una rama; cuando se quiera abrir PRs por CAP se rebasarán en branches separadas).
 
-**Plans implementados (12/17 con tag; 1 más a 2 tasks de completar):**
+**Plans implementados (13/17 con tag):**
 | # | CAP | Tag | Estado |
 |---|---|---|---|
 | 01 | CAP-INFRA-PERSISTENCE | `cap-01-infra-persistence` | ✅ |
@@ -281,7 +281,7 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 | 12 | CAP-CHAT-DOC-RETRIEVAL | `cap-12-chat-doc-retrieval` | ✅ (RetrieveDocs + utility endpoint `/search`) |
 | 14 | CAP-CHAT-SESSIONS | `cap-14-chat-sessions` | ✅ (sessions/messages + read endpoints + helpers para #15) |
 | 15 | CAP-CHAT-AGENT-LOOP | `cap-15-chat-agent-loop` | ✅ **M3 CERRADO** (LLM port + Ollama adapter + agent loop + `POST /chat`) |
-| 17 | CAP-EVAL-RAGAS | _(sin tag — parcial)_ | ⏳ **Tasks 1-4/6 commiteadas** (eval VOs + answer_query persist + RagasEvaluator + run_ragas_evaluation + report_writer). Falta CLI + integration test + cleanup. |
+| 17 | CAP-EVAL-RAGAS | `cap-17-eval-ragas` | ✅ (RAGAS evaluator + run_ragas_evaluation + report writer + CLI `eval-ragas` + e2e CLI test, 6/6 tasks) |
 
 **Cambio de orden frente al catálogo:** hemos saltado #9 (KB-DB-SOURCES, M4) y #11 (WIDGET-CONFIG) para priorizar la demo M3 (chatbot que responde sobre los docs de M2). El usuario lo confirmó en sesión 6.
 
@@ -293,10 +293,11 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 - `pytest tests/unit` ✅ **138 passed**
 - `pytest tests/integration -m integration` ✅ **28 passed** contra Postgres + Qdrant + Ollama (llama3.1 + bge-m3)
 
-**Verificación al cierre de sesión 8 (mid-plan-17):**
-- `pytest tests/unit` ✅ **138 + 21 nuevos = 159 passed** (17 Task1 + 4 Task2 + 5 Task3 + 9 Task4 — todo lo nuevo del plan #17 hasta ahora)
-- `ruff check .` + `mypy src/` NO ejecutados todavía (convención: cleanup al final del plan). Se harán cuando se cierre #17.
-- `pytest tests/integration -m integration`: sin cambios (28 passed — Task 6 es el que añade el 29º cuando se lance).
+**Verificación al cierre de sesión 9 (plan #17 cerrado):**
+- `ruff check .` ✅ All checks passed (17 autofixes aplicados en cleanup commit `470c47e`, todos UP017 `datetime.UTC`).
+- `mypy src/` ✅ Success: no issues found in 154 source files (un `type: ignore[index]` huérfano eliminado en el mismo commit).
+- `pytest tests/ -m "not integration"` ✅ **173 passed**, 28 deselected.
+- `pytest tests/integration -m integration` ✅ **29 passed** contra Postgres + Qdrant + Ollama (llama3.1 + bge-m3) en 7m13s. El test e2e de CLI nuevo corre en 4m49s y genera report.json + report.md con 2/2 cases scored y 0 errors.
 
 **Bugs reales encontrados y arreglados en sesión 6:**
 - **`bootstrap_tenant` FK ordering** (commit `e21c658`): SQLAlchemy no detecta la dependencia de INSERT entre `TenantRow` y `ProviderCredentialRow` sin un `relationship()` declarado, así que emitía el credential primero → `ForeignKeyViolationError`. Fix: flush intermedio entre `session.add(tenant)` y `session.add(credential)`. Lo descubrieron los integration tests en cuanto Docker estuvo arriba — los unit tests no lo cogieron porque mockean el repo.
@@ -322,7 +323,7 @@ Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §
 - **`python-multipart>=0.0.9`** añadido en plan #8 como dep (lo requiere FastAPI para `File`/`Form` uploads).
 - **Scripts de bootstrap creados (sesión 6):** `scripts/setup.sh` (instalación idempotente en PC nuevo) + `scripts/run-backend.sh` (arrancar uvicorn con las env vars correctas). README en raíz reescrito como entry point completo.
 
-**Plans pendientes (5/17):** #9 KB-DB-SOURCES (M4) → #11 CHATBOT-WIDGET-CONFIG → #13 CHAT-SQL-EXECUTION → #16 WIDGET-RUNTIME → #17 EVAL-RAGAS. Todos ortogonales a la demo M3 ya operativa.
+**Plans pendientes (4/17):** #9 KB-DB-SOURCES (M4) → #11 CHATBOT-WIDGET-CONFIG → #13 CHAT-SQL-EXECUTION → #16 WIDGET-RUNTIME. Todos ortogonales a la demo M3 ya operativa. **Pieza académica (#17) cerrada.**
 
 ### Workflow de ejecución acordado con el usuario
 
@@ -335,31 +336,36 @@ Para minimizar interrupciones (confirmado y validado en sesión 6):
 
 ### Próximo paso concreto en la siguiente sesión
 
-**Estado al pausar la sesión 8: plan #17 (EVAL-RAGAS) parcial — 4/6 tasks committed, sin tag todavía.**
+**Estado al cierre de sesión 9: plan #17 (EVAL-RAGAS) CERRADO — 6/6 tasks committed, tag movido.**
 
-Commits del plan #17 hechos:
+Commits del plan #17 (en orden):
 - `4add02e` feat(eval): Task 1 — EvaluationCase + EvaluationReport VOs + scenarios catalog + JSONL loader (17 tests)
 - `28e6422` feat(chat): Task 2 — AnswerView.retrieved_contexts + answer_query(persist=...) for eval (4 nuevos + 7 regresión #15)
 - `32332f2` feat(eval): Task 3 — RagasEvaluator adapter + eval extras (5 tests). **Concern resuelto**: `ragas>=0.2,<0.3` + `langchain-community>=0.3,<0.4` (ragas 0.4 importa ChatVertexAI de paths que langchain-community 0.4 quitó). Las versiones instaladas son ragas 0.2.15 + langchain-community 0.3.31. Memorizado.
 - `292c061` feat(eval): Task 4 — run_ragas_evaluation orchestrator + report writer (4+5=9 tests)
+- `6cea7b9` feat(cli): Task 5 — `eval_ragas.py` CLI (argparse + bootstrap DB + script entry `eval-ragas` ya presente en pyproject.toml)
+- `470c47e` chore(plan-17): ruff autofix (17 fixes UP017 `datetime.UTC` en archivos de Tasks 1-5) + mypy fix (eliminado `# type: ignore[index]` huérfano en `evaluation_report.py:34`)
+- `9e20cf6` test(eval): Task 6 — integration e2e CLI vs live Ollama (29º test, 4m49s, 2/2 scored, 0 errors)
 
-Pendientes del plan #17:
-- **Task 5 (CLI)** — `backend/src/tfm_rag/cli/eval_ragas.py` con argparse + bootstrap DB. Plan tiene el código verbatim. **Haiku, ~5 min**.
-- **Task 6 (integration test e2e)** — `backend/tests/integration/test_eval_ragas_cli_flow.py`. Slow (~3-6 min). Requiere Docker + Ollama llama3.1 + bge-m3 en el host. Plan tiene el código verbatim. **Sonnet**.
-- **Cleanup** — `ruff check . --fix`, `mypy src/`, `pytest tests/ -m "not integration"`. Si autofix, commit `chore(plan-17): ruff autofix`. Tag `cap-17-eval-ragas` al cleanup commit (o al commit de Task 6 si cleanup no hace nada). Convención del repo.
+**Tag aplicado**: `cap-17-eval-ragas` → `9e20cf6`. **Nota**: rompe ligeramente la convención "tag siempre al cleanup commit" del repo porque el cleanup se ejecutó ANTES de Task 6 (Docker estaba caído al empezar la sesión y se aprovechó para correr ruff/mypy/unit-tests sin Task 6 todavía escrita). El tag apunta al último commit del plan, que es Task 6. Las verificaciones de cleanup ya estaban hechas antes y siguen pasando.
+
+Decide entre los 4 plans pendientes:
+- **#9 KB-DB-SOURCES** (M4) — DatabaseSource: introspección SQL + text2SQL via tool. Sigue al MVP M4 doc+DB.
+- **#11 CHATBOT-WIDGET-CONFIG** — extender chatbot con `widget_config` (estilos, branding, plantillas). Pequeño.
+- **#13 CHAT-SQL-EXECUTION** — añade tool `query_database` al loop agéntico (cierra M4 junto con #9).
+- **#16 WIDGET-RUNTIME** — embeddable widget JS + endpoint público de chat.
 
 Pasos al retomar:
 1. Lee este handover.
-2. Verifica Docker arriba. **OJO con Ollama dual**: la app usa el Ollama del HOST. `ollama list` desde el host debe mostrar `llama3.1` + `bge-m3`. Si faltan, `ollama pull` en el host (no en el container).
-3. Si quieres terminar #17, lanza Task 5 directamente con el código verbatim de `docs/superpowers/plans/2026-05-24-17-cap-eval-ragas.md` Task 5; luego Task 6; luego cleanup + tag.
-4. Si quieres cambiar de plan, decide entre #9 (KB-DB-SOURCES, M4), #11 (WIDGET-CONFIG), #13 (CHAT-SQL-EXECUTION), #16 (WIDGET-RUNTIME).
+2. Verifica Docker arriba. **Tip**: Docker Desktop se puede arrancar desde WSL con `"/mnt/c/Program Files/Docker/Docker/Docker Desktop.exe" &` y esperar ~20s; los containers se levantan solos si ya existían. **Ollama dual**: la app usa el Ollama del HOST. `ollama list` desde el host debe mostrar `llama3.1:latest` + `bge-m3:latest`.
+3. Si vas a hacer un plan nuevo, invoca `superpowers:writing-plans` con el HTML §7 ficha correspondiente.
 
-**M3 está hecho** — los plans restantes son ortogonales a la demo principal. La pieza académica (#17) está a 2 tasks de cerrar.
+**M3 + M6 (eval RAGAS académica) cerrados** — los plans restantes son features adicionales, no bloqueantes para la demo principal ni para la entrega académica.
 
 ### Pendientes / riesgos conocidos
 
 - **Docker WSL2 operativo** — `docker compose up -d postgres qdrant ollama` desde `infra/` funciona. Ollama image (~3.86 GB) descargada y volúmenes persistentes.
-- **Tags movidos tras cleanup (convención consolidada)** — todos los `cap-NN-*` apuntan al commit `chore(plan-NN): ruff autofix` final, no al `feat:` original. Última secuencia: cap-07 → e56950c, cap-08 → f545631, cap-10 → c23e5e4, cap-12 → c9aa7c2, cap-14 → db689b5, cap-15 → 226db16.
+- **Tags movidos tras cleanup (convención consolidada)** — todos los `cap-NN-*` apuntan al commit `chore(plan-NN): ruff autofix` final, no al `feat:` original. Última secuencia: cap-07 → e56950c, cap-08 → f545631, cap-10 → c23e5e4, cap-12 → c9aa7c2, cap-14 → db689b5, cap-15 → 226db16. **Excepción `cap-17` → `9e20cf6` (Task 6 e2e)**: cleanup se hizo antes de Task 6 (Docker caído al empezar la sesión), y el tag apunta al último commit del plan, no al cleanup. Sin impacto funcional.
 - **Branch `feat/cap-01-infra-persistence`** acumula 11 CAPs. Cuando se quiera abrir PRs separadas, rebasear en branches por tag.
 - **`_session_factory` global** en `infrastructure/api/dependencies.py` — sigue pendiente el refactor a `app.state.session_factory` en lifespan FastAPI. Cada vez que un test de integración nuevo toca routers necesita resetearlo en su fixture.
 - **Qdrant client 1.18.0 vs server 1.12.0** — warning en cada llamada; no bloqueante. La librería ya migró internamente de `.search()` a `.query_points()` (visto en plan #12).
@@ -443,15 +449,16 @@ curl -X POST http://localhost:8000/api/auth/register \
 ```
 #1-#7  [completed] Diseño (15 secciones HTML + 10 preguntas
                    respondidas + writing-plans invocado)
-#8     [in_progress] Escribir + implementar 17 plans (12/17 hechos)
+#8     [in_progress] Escribir + implementar 17 plans (13/17 hechos)
                      ✅ Plans 01-06 (M1 cerrado, todos tagged + E2E verificado)
                      ✅ Plans 07-08 (M2 demo MVP — KB CRUD + ingestion + Qdrant)
                      ✅ Plans 10, 12, 14, 15 (M3 CERRADO — chatbots + retrieval + sessions + agent loop)
-                     ⏳ Plans 09, 11, 13, 16, 17 (M4-M7, ortogonales a la demo principal)
+                     ✅ Plan 17 (M6 RAGAS eval CERRADO — VOs + RagasEvaluator + CLI + e2e test)
+                     ⏳ Plans 09, 11, 13, 16 (M4-M7, ortogonales a la demo principal)
 #9     [completed]   Ejecutar integration tests con Docker disponible
-                     (12/12 → 17/17 → 20/20 → 25/25 → 28/28 — sesión 7)
+                     (12/12 → 17/17 → 20/20 → 25/25 → 28/28 → 29/29 — sesión 9)
 #10    [pending]     PR(s) — decidir si uno por CAP o uno por M
 #11    [completed]   Bootstrap scripts + README + run-backend.sh (sesión 6)
 ```
 
-Estado actual: en pausa para handover. **M3 demo está operativa**: la siguiente sesión puede iniciar cualquiera de los plans M4-M7 según prioridad del usuario.
+Estado actual: en pausa para handover. **M3 demo + M6 eval académica operativas**: la siguiente sesión puede iniciar cualquiera de los 4 plans pendientes (#9, #11, #13, #16).

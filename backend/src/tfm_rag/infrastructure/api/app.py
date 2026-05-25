@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from tfm_rag.infrastructure.api.middleware.tenant_scoping import (
     TenantScopingMiddleware,
@@ -43,6 +46,16 @@ def create_app() -> FastAPI:
     app.include_router(chatbots.router)
     app.include_router(sessions.router)
     app.include_router(public_chat.router)
+    # Serve the embeddable widget JS + demo HTML from the `widget/` directory
+    # at the repo root. The path is resolved relative to this file so it
+    # works regardless of cwd.
+    widget_dir = Path(__file__).resolve().parents[5] / "widget"
+    if widget_dir.is_dir():
+        app.mount(
+            "/widget",
+            StaticFiles(directory=str(widget_dir), html=True),
+            name="widget",
+        )
     return app
 
 

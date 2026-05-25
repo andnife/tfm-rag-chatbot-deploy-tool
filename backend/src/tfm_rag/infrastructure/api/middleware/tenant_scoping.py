@@ -17,6 +17,7 @@ UNAUTHENTICATED_PREFIXES: tuple[str, ...] = (
     "/docs",
     "/redoc",
     "/openapi.json",
+    "/widget",
 )
 
 

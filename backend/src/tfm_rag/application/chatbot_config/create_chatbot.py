@@ -1,3 +1,4 @@
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -14,6 +15,7 @@ from tfm_rag.domain.errors.knowledge import (
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
 from tfm_rag.domain.value_objects.llm_selection import LLMSelection
 from tfm_rag.domain.value_objects.pipeline_config import PipelineConfig
+from tfm_rag.domain.value_objects.widget_config import WidgetConfig
 from tfm_rag.infrastructure.persistence.models.chatbots import ChatbotRow
 from tfm_rag.infrastructure.persistence.repositories.chatbots_repo import (
     ChatbotRepository,
@@ -22,6 +24,11 @@ from tfm_rag.infrastructure.persistence.repositories.knowledge_bases_repo import
     KnowledgeBaseRepository,
 )
 from tfm_rag.infrastructure.persistence.repository import RequestContext
+
+
+def _generate_public_key() -> str:
+    return "wgt_" + secrets.token_urlsafe(32)
+
 
 ChatbotRepoFactory = Callable[
     [AsyncSession, RequestContext], ChatbotRepository
@@ -53,6 +60,7 @@ class ChatbotView:
     llm_selection: LLMSelection
     pipeline_config: PipelineConfig
     widget_config: dict[str, Any]
+    public_key: str
     kb_ids: list[UUID]
 
 
@@ -66,6 +74,7 @@ def _to_view(row: ChatbotRow, kb_ids: list[UUID]) -> ChatbotView:
         llm_selection=LLMSelection.from_dict(row.llm_selection),
         pipeline_config=PipelineConfig.from_dict(row.pipeline_config),
         widget_config=row.widget_config,
+        public_key=row.public_key,
         kb_ids=kb_ids,
     )
 
@@ -106,7 +115,7 @@ async def create_chatbot(
     llm_selection: LLMSelection,
     kb_ids: list[UUID],
     pipeline_config: PipelineConfig,
-    widget_config: dict[str, Any],
+    widget_config: WidgetConfig,
 ) -> ChatbotView:
     name = name.strip()
     if not name:
@@ -125,6 +134,7 @@ async def create_chatbot(
     kb_repo = kb_repo_factory(session, ctx)
     await _validate_kb_compatibility(kb_repo, kb_ids)
 
+    public_key = _generate_public_key()
     chatbot_id = uuid4()
     row = ChatbotRow(
         id=chatbot_id,
@@ -139,7 +149,8 @@ async def create_chatbot(
             else None
         ),
         pipeline_config=pipeline_config.to_dict(),
-        widget_config=widget_config,
+        widget_config=widget_config.to_dict(),
+        public_key=public_key,
     )
     await chatbot_repo.add(row)
     await chatbot_repo.replace_kb_links(chatbot_id, kb_ids)

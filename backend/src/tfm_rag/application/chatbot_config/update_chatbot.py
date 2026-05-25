@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +12,7 @@ from tfm_rag.domain.errors.chatbot import ChatbotNotFoundError
 from tfm_rag.domain.errors.common import NotFoundError, ValidationError
 from tfm_rag.domain.value_objects.llm_selection import LLMSelection
 from tfm_rag.domain.value_objects.pipeline_config import PipelineConfig
+from tfm_rag.domain.value_objects.widget_config import WidgetConfig
 from tfm_rag.infrastructure.persistence.repositories.chatbots_repo import (
     ChatbotRepository,
 )
@@ -54,7 +54,7 @@ async def update_chatbot(
     llm_selection: LLMSelection | None,
     kb_ids: list[UUID] | None,
     pipeline_config: PipelineConfig | None,
-    widget_config: dict[str, Any] | None,
+    widget_config: WidgetConfig | None,
 ) -> ChatbotView:
     chatbot_repo = chatbot_repo_factory(session, ctx)
     try:
@@ -83,7 +83,7 @@ async def update_chatbot(
             else None
         )
     if widget_config is not None:
-        row.widget_config = widget_config
+        row.widget_config = widget_config.to_dict()
 
     current_kb_ids: list[UUID]
     if kb_ids is not None:

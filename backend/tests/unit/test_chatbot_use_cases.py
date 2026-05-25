@@ -18,6 +18,7 @@ from tfm_rag.domain.errors.knowledge import IncompatibleEmbeddingsError
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
 from tfm_rag.domain.value_objects.llm_selection import LLMSelection
 from tfm_rag.domain.value_objects.pipeline_config import PipelineConfig
+from tfm_rag.domain.value_objects.widget_config import WidgetConfig
 from tfm_rag.infrastructure.persistence.repository import RequestContext
 
 
@@ -82,7 +83,7 @@ async def test_create_chatbot_with_zero_kbs_is_allowed() -> None:
         llm_selection=_llm(),
         kb_ids=[],
         pipeline_config=PipelineConfig.default(),
-        widget_config={"theme": "light"},
+        widget_config=WidgetConfig.default(),
     )
 
     assert result.kb_ids == []
@@ -115,7 +116,7 @@ async def test_create_chatbot_with_compatible_kbs_succeeds() -> None:
         llm_selection=_llm(),
         kb_ids=[kb1.id, kb2.id],
         pipeline_config=PipelineConfig.default(),
-        widget_config={},
+        widget_config=WidgetConfig.default(),
     )
 
     assert set(result.kb_ids) == {kb1.id, kb2.id}
@@ -148,7 +149,7 @@ async def test_create_chatbot_with_incompatible_kbs_rejected() -> None:
             llm_selection=_llm(),
             kb_ids=[kb_a.id, kb_b.id],
             pipeline_config=PipelineConfig.default(),
-            widget_config={},
+            widget_config=WidgetConfig.default(),
         )
 
 
@@ -174,7 +175,7 @@ async def test_create_chatbot_with_unknown_kb_rejected_as_not_found() -> None:
             llm_selection=_llm(),
             kb_ids=[uuid4()],
             pipeline_config=PipelineConfig.default(),
-            widget_config={},
+            widget_config=WidgetConfig.default(),
         )
 
 
@@ -197,7 +198,7 @@ async def test_create_chatbot_duplicate_name_rejected() -> None:
             llm_selection=_llm(),
             kb_ids=[],
             pipeline_config=PipelineConfig.default(),
-            widget_config={},
+            widget_config=WidgetConfig.default(),
         )
 
 
@@ -216,7 +217,8 @@ async def test_update_chatbot_changes_kbs_and_revalidates() -> None:
     chatbot_row.llm_selection = _llm().to_dict()
     chatbot_row.router_llm_selection = None
     chatbot_row.pipeline_config = PipelineConfig.default().to_dict()
-    chatbot_row.widget_config = {}
+    chatbot_row.widget_config = WidgetConfig.default().to_dict()
+    chatbot_row.public_key = "wgt_existing"
     chatbot_row.created_at = None
     chatbot_row.updated_at = None
 
@@ -320,3 +322,78 @@ async def test_delete_chatbot_missing_raises_chatbot_not_found() -> None:
             chatbot_repo_factory=lambda s, c: repo,
             chatbot_id=uuid4(),
         )
+
+
+@pytest.mark.asyncio
+async def test_create_chatbot_generates_public_key() -> None:
+    session = MagicMock()
+    session.add = MagicMock()
+    session.flush = AsyncMock()
+    ctx = _ctx()
+
+    chatbot_repo = MagicMock()
+    chatbot_repo.find_by_name = AsyncMock(return_value=None)
+    chatbot_repo.add = AsyncMock(side_effect=lambda r: r)
+    chatbot_repo.replace_kb_links = AsyncMock()
+
+    kb_repo = MagicMock()
+
+    view = await create_chatbot(
+        session, ctx,
+        chatbot_repo_factory=lambda s, c: chatbot_repo,
+        kb_repo_factory=lambda s, c: kb_repo,
+        name="PublicKeyBot",
+        description=None,
+        system_prompt="Be concise.",
+        llm_selection=_llm(),
+        kb_ids=[],
+        pipeline_config=PipelineConfig.default(),
+        widget_config=WidgetConfig.default(),
+    )
+
+    assert isinstance(view.public_key, str)
+    assert view.public_key.startswith("wgt_")
+    assert len(view.public_key) > 10
+
+
+@pytest.mark.asyncio
+async def test_update_chatbot_does_not_touch_public_key() -> None:
+    session = MagicMock()
+    session.flush = AsyncMock()
+    ctx = _ctx()
+
+    chatbot_row = MagicMock()
+    chatbot_row.id = uuid4()
+    chatbot_row.tenant_id = ctx.tenant_id
+    chatbot_row.name = "bot"
+    chatbot_row.description = None
+    chatbot_row.system_prompt = "prompt"
+    chatbot_row.llm_selection = _llm().to_dict()
+    chatbot_row.router_llm_selection = None
+    chatbot_row.pipeline_config = PipelineConfig.default().to_dict()
+    chatbot_row.widget_config = WidgetConfig.default().to_dict()
+    chatbot_row.public_key = "wgt_existing"
+    chatbot_row.created_at = None
+    chatbot_row.updated_at = None
+
+    chatbot_repo = MagicMock()
+    chatbot_repo.get = AsyncMock(return_value=chatbot_row)
+    chatbot_repo.list_kb_ids = AsyncMock(return_value=[])
+
+    kb_repo = MagicMock()
+
+    await update_chatbot(
+        session, ctx,
+        chatbot_repo_factory=lambda s, c: chatbot_repo,
+        kb_repo_factory=lambda s, c: kb_repo,
+        chatbot_id=chatbot_row.id,
+        name=None,
+        description=None,
+        system_prompt=None,
+        llm_selection=None,
+        kb_ids=None,
+        pipeline_config=None,
+        widget_config=WidgetConfig.default(),
+    )
+
+    assert chatbot_row.public_key == "wgt_existing"

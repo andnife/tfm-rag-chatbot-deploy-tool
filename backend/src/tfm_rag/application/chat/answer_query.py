@@ -2,7 +2,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -178,6 +178,8 @@ async def answer_query(
     session_id: UUID | None,
     user_message: str,
     persist: bool = True,
+    session_origin: Literal["playground", "widget"] = "playground",
+    public_session_cookie: str | None = None,
 ) -> AnswerView:
     """Agent-loop use case: answers `user_message` for `chatbot_id`,
     persisting both user + assistant turns to the session.
@@ -234,8 +236,8 @@ async def answer_query(
             session_id = await create_session(
                 session, ctx,
                 chatbot_id=chatbot_id,
-                origin="playground",
-                public_session_cookie=None,
+                origin=session_origin,
+                public_session_cookie=public_session_cookie,
             )
         else:
             # Throwaway UUID — no DB row exists. Eval flows don't read

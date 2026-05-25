@@ -94,3 +94,93 @@ async def widget_config_(
         name=view.name,
         widget=widget_cfg.to_dict(),
     )
+
+
+# --- POST /chat ---------------------------------------------------------------
+
+from uuid import UUID  # noqa: E402
+
+from tfm_rag.application.chat.answer_query import answer_query  # noqa: E402
+from tfm_rag.infrastructure.embedders.dispatcher import EmbedderDispatcher  # noqa: E402
+from tfm_rag.infrastructure.llm_providers.dispatcher import LLMDispatcher  # noqa: E402
+from tfm_rag.infrastructure.persistence.models.chat_sessions import (  # noqa: E402
+    ChatSessionRow,
+)
+from tfm_rag.infrastructure.settings import Settings, get_settings  # noqa: E402
+from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore  # noqa: E402
+from tfm_rag.infrastructure.api.routers.chatbots import ChatOut  # noqa: E402
+
+
+class PublicChatIn(BaseModel):
+    session_id: str | None = None
+    public_session_cookie: str
+    message: str
+
+
+@router.post("/{public_key}/chat", response_model=ChatOut)
+async def public_chat_(
+    public_key: str,
+    body: PublicChatIn,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> ChatOut:
+    view = await _load_or_404(session, public_key)
+    widget_cfg = WidgetConfig.from_dict(view.widget_config)
+    _apply_cors(response, request, widget_cfg)
+
+    # --- session_id + cookie verification ----------------------------------
+    parsed_session_id: UUID | None = None
+    if body.session_id:
+        try:
+            parsed_session_id = UUID(body.session_id)
+        except ValueError as exc:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"session_id is not a valid UUID: {body.session_id!r}",
+            ) from exc
+
+        # Verify cookie matches the persisted row.
+        from sqlalchemy import select  # noqa: PLC0415
+
+        stmt = select(ChatSessionRow).where(
+            ChatSessionRow.id == parsed_session_id,
+            ChatSessionRow.chatbot_id == view.id,
+        )
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, detail="session not found",
+            )
+        if row.origin != "widget":
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="session origin mismatch (not a widget session)",
+            )
+        if row.public_session_cookie != body.public_session_cookie:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, detail="invalid session cookie",
+            )
+
+    # --- ctx for downstream tenant-scoped operations -----------------------
+    ctx = RequestContext(tenant_id=view.tenant_id, user_id=None)
+
+    qdrant = QdrantStore(settings.qdrant_url, settings.qdrant_api_key)
+    try:
+        result = await answer_query(
+            session, ctx,
+            llm_dispatcher=LLMDispatcher.default(),
+            qdrant=qdrant,
+            embedder_dispatcher=EmbedderDispatcher.default(),
+            settings=settings,
+            chatbot_id=view.id,
+            session_id=parsed_session_id,
+            user_message=body.message,
+            session_origin="widget",
+            public_session_cookie=body.public_session_cookie,
+        )
+    finally:
+        await qdrant.close()
+
+    return ChatOut.from_view(result)

@@ -31,6 +31,24 @@ services:
       timeout: 3s
       retries: 10
 
+  mysql_source:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tfm_rag_source_test}
+      MYSQL_USER: ${MYSQL_USER:-tfm}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tfm}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_source_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpw}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
@@ -72,3 +90,4 @@ volumes:
   postgres_data:
   qdrant_data:
   ollama_data:
+  mysql_source_data:

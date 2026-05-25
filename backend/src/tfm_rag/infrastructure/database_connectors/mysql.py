@@ -32,7 +32,7 @@ _CONNECT_TIMEOUT_S = 10.0
 class MySQLConnector(DatabaseConnector):
     async def test_connection(self, spec: dict[str, Any]) -> None:
         conn = await self._connect(spec)
-        await conn.close()
+        conn.close()  # asyncmy close() is synchronous
 
     async def introspect_schema(
         self, spec: dict[str, Any]
@@ -46,7 +46,7 @@ class MySQLConnector(DatabaseConnector):
             except asyncmy.errors.Error as exc:
                 raise SchemaIntrospectionError(str(exc)) from exc
         finally:
-            await conn.close()
+            conn.close()  # asyncmy close() is synchronous
 
         tables = self._group_rows_to_tables(rows)
         return DatabaseSchemaSnapshot(

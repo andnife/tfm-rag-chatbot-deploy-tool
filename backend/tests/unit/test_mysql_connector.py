@@ -1,5 +1,4 @@
 """Unit tests for the MySQLConnector adapter. asyncmy is monkey-patched."""
-import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -57,7 +56,8 @@ class _FakeConnection:
     def cursor(self) -> _FakeCursor:
         return _FakeCursor(self.rows)
 
-    async def close(self) -> None:
+    def close(self) -> None:
+        # asyncmy.Connection.close() is synchronous (returns None, not a coroutine).
         self.closed = True
 
 
@@ -155,7 +155,7 @@ async def test_test_connection_network_failure_raises_database_connection_error(
 async def test_test_connection_timeout_raises_database_connection_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _patch_connect(monkeypatch, raise_exc=asyncio.TimeoutError())
+    _patch_connect(monkeypatch, raise_exc=TimeoutError())
 
     with pytest.raises(DatabaseConnectionError) as exc_info:
         await MySQLConnector().test_connection(_spec())

@@ -1,10 +1,8 @@
 """Unit tests for attach_database_source use case."""
 import base64
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
-
-_NOW = datetime(2026, 5, 25, 12, 0, tzinfo=timezone.utc)
 
 import pytest
 
@@ -30,6 +28,8 @@ from tfm_rag.domain.value_objects.database_source_spec import (
     DatabaseSourceSpec,
 )
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
+
+_NOW = datetime(2026, 5, 25, 12, 0, tzinfo=UTC)
 
 pytestmark = pytest.mark.asyncio
 
@@ -116,7 +116,7 @@ class _FakeSession:
 
 def _snapshot() -> DatabaseSchemaSnapshot:
     return DatabaseSchemaSnapshot(
-        captured_at=datetime(2026, 5, 25, 10, 0, tzinfo=timezone.utc),
+        captured_at=datetime(2026, 5, 25, 10, 0, tzinfo=UTC),
         tables=(
             TableSchema(
                 schema="public",

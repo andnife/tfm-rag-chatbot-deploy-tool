@@ -5,13 +5,13 @@ container to host the application DB. The DatabaseConnector is REPLACED
 with a fake via the SOURCE_CONNECTION_TESTERS registry monkey-patch so
 no external DB is touched — only the app DB.
 """
-import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 
 import tfm_rag.infrastructure.api.dependencies as _deps
 from tfm_rag.infrastructure.api.app import app
@@ -23,7 +23,6 @@ from tfm_rag.infrastructure.persistence.engine import (
     build_session_factory,
 )
 from tfm_rag.infrastructure.settings import Settings
-from sqlalchemy import text
 
 pytestmark = pytest.mark.integration
 
@@ -46,11 +45,13 @@ class _FakeConnector:
 
     async def introspect_schema(self, spec: dict[str, Any]) -> Any:
         from tfm_rag.domain.value_objects.database_schema import (
-            ColumnSchema, DatabaseSchemaSnapshot, TableSchema,
+            ColumnSchema,
+            DatabaseSchemaSnapshot,
+            TableSchema,
         )
         self.introspect_calls.append(spec)
         return DatabaseSchemaSnapshot(
-            captured_at=datetime(2026, 5, 25, 10, 0, tzinfo=timezone.utc),
+            captured_at=datetime(2026, 5, 25, 10, 0, tzinfo=UTC),
             tables=(
                 TableSchema(
                     schema="public", name="users",

@@ -1,6 +1,5 @@
 """PostgresConnector — asyncpg adapter for DatabaseConnector port."""
-import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import asyncpg
@@ -48,7 +47,7 @@ class PostgresConnector(DatabaseConnector):
 
         tables = self._group_rows_to_tables(rows)
         return DatabaseSchemaSnapshot(
-            captured_at=datetime.now(timezone.utc),
+            captured_at=datetime.now(UTC),
             tables=tables,
         )
 
@@ -72,7 +71,7 @@ class PostgresConnector(DatabaseConnector):
             ) from exc
         except asyncpg.PostgresError as exc:
             raise DatabaseConnectionError(self._safe(exc)) from exc
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise DatabaseConnectionError(
                 f"connection timeout after {_CONNECT_TIMEOUT_S:.0f}s"
             ) from exc

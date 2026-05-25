@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
@@ -60,10 +60,10 @@ from tfm_rag.domain.errors.knowledge import (
     SourceNotFoundError,
     UnsupportedDatabaseDialectError,
 )
+from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.database_source_spec import (
     DatabaseSourceSpec,
 )
-from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
 from tfm_rag.domain.value_objects.retrieved_chunk import RetrievedChunk
 from tfm_rag.infrastructure.api.dependencies import (
@@ -71,13 +71,10 @@ from tfm_rag.infrastructure.api.dependencies import (
     get_current_context,
     get_session,
 )
+from tfm_rag.infrastructure.chunkers.fixed_size import FixedSizeChunker
 from tfm_rag.infrastructure.database_connectors.source_tester import (
     DATABASE_CONNECTORS,
 )
-from tfm_rag.infrastructure.secrets.fernet_encryptor import (
-    FernetSecretEncryptor,
-)
-from tfm_rag.infrastructure.chunkers.fixed_size import FixedSizeChunker
 from tfm_rag.infrastructure.document_loaders.dispatcher import LoaderDispatcher
 from tfm_rag.infrastructure.document_loaders.pdf import PdfLoader
 from tfm_rag.infrastructure.document_loaders.txt import TxtLoader
@@ -92,6 +89,9 @@ from tfm_rag.infrastructure.persistence.models.knowledge_bases import (
 )
 from tfm_rag.infrastructure.persistence.models.sources import SourceRow
 from tfm_rag.infrastructure.persistence.repository import RequestContext
+from tfm_rag.infrastructure.secrets.fernet_encryptor import (
+    FernetSecretEncryptor,
+)
 from tfm_rag.infrastructure.settings import Settings, get_settings
 from tfm_rag.infrastructure.storage.local import LocalStorage
 from tfm_rag.infrastructure.vector_store.qdrant_client import (
@@ -609,7 +609,7 @@ class _InlineSourcesRepo:
                 type="database",
                 payload=payload,
                 ingest_status="done",
-                last_ingest_at=datetime.now(timezone.utc),
+                last_ingest_at=datetime.now(UTC),
             )
         )
         return source_id

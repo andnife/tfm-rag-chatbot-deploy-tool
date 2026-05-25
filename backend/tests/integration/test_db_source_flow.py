@@ -6,11 +6,9 @@ DatabaseSource. Uses the live Docker stack:
 
 This test is `integration` — slow (~30s for both setup + introspection).
 """
-import asyncio
-from typing import Any
 
-import asyncpg
 import asyncmy
+import asyncpg
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text

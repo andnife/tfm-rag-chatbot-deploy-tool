@@ -1,7 +1,5 @@
 """Unit tests for the PostgresConnector adapter. asyncpg is monkey-patched."""
-import asyncio
-from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -143,7 +141,7 @@ async def test_test_connection_network_failure_raises_database_connection_error(
 async def test_test_connection_timeout_raises_database_connection_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _patch_connect(monkeypatch, raise_exc=asyncio.TimeoutError())
+    _patch_connect(monkeypatch, raise_exc=TimeoutError())
 
     with pytest.raises(DatabaseConnectionError) as exc_info:
         await PostgresConnector().test_connection(_spec())

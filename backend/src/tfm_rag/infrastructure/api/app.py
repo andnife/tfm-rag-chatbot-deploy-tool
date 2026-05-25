@@ -11,6 +11,7 @@ from tfm_rag.infrastructure.api.routers import (
     health,
     ingestion_jobs,
     knowledge_bases,
+    public_chat,
     sessions,
 )
 from tfm_rag.infrastructure.settings import get_settings
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(ingestion_jobs.router)
     app.include_router(chatbots.router)
     app.include_router(sessions.router)
+    app.include_router(public_chat.router)
     return app
 
 

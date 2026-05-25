@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
     # the response). Plan #11 ships permissive defaults so the embeddable
     # widget can prototype against a dev backend.
     app.add_middleware(
-        NonOverwritingCORSMiddleware,
+        NonOverwritingCORSMiddleware,  # type: ignore[arg-type]
         allow_origins=["*"],
         allow_credentials=False,
         allow_methods=["*"],

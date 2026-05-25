@@ -101,6 +101,7 @@ async def widget_config_(
 from uuid import UUID  # noqa: E402
 
 from tfm_rag.application.chat.answer_query import answer_query  # noqa: E402
+from tfm_rag.infrastructure.api.routers.chatbots import ChatOut  # noqa: E402
 from tfm_rag.infrastructure.embedders.dispatcher import EmbedderDispatcher  # noqa: E402
 from tfm_rag.infrastructure.llm_providers.dispatcher import LLMDispatcher  # noqa: E402
 from tfm_rag.infrastructure.persistence.models.chat_sessions import (  # noqa: E402
@@ -108,7 +109,6 @@ from tfm_rag.infrastructure.persistence.models.chat_sessions import (  # noqa: E
 )
 from tfm_rag.infrastructure.settings import Settings, get_settings  # noqa: E402
 from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore  # noqa: E402
-from tfm_rag.infrastructure.api.routers.chatbots import ChatOut  # noqa: E402
 
 
 class PublicChatIn(BaseModel):

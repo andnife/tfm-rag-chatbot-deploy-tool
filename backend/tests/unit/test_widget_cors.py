@@ -1,8 +1,6 @@
 """Unit tests for the per-chatbot CORS resolver."""
-import pytest
 
 from tfm_rag.application.chat.widget_cors import resolve_allowed_origin
-
 
 # --- empty allowed list -------------------------------------------------------
 

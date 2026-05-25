@@ -30,7 +30,7 @@ class NonOverwritingCORSMiddleware(CORSMiddleware):
     def __init__(self, app: ASGIApp, **kwargs: Any) -> None:
         super().__init__(app, **kwargs)
 
-    async def send(  # type: ignore[override]
+    async def send(
         self,
         message: Message,
         send: Send,

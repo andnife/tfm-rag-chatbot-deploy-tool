@@ -4,10 +4,7 @@ import pytest
 from tfm_rag.domain.errors.common import ValidationError
 from tfm_rag.domain.value_objects.widget_config import (
     WidgetConfig,
-    WidgetPosition,
-    WidgetTheme,
 )
-
 
 # --- happy path ----------------------------------------------------------------
 

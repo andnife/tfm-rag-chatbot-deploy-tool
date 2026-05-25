@@ -1,5 +1,4 @@
 """Unit tests for get_chatbot_by_public_key (tenant-agnostic lookup)."""
-from typing import Any
 from uuid import UUID, uuid4
 
 import pytest

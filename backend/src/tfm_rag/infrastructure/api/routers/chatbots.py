@@ -35,6 +35,7 @@ from tfm_rag.domain.value_objects.pipeline_config import (
     PipelineConfig,
 )
 from tfm_rag.domain.value_objects.retrieval_iteration import RetrievalIteration
+from tfm_rag.domain.value_objects.widget_config import WidgetConfig
 from tfm_rag.infrastructure.api.dependencies import (
     get_current_context,
     get_session,
@@ -118,8 +119,7 @@ class WidgetConfigIn(BaseModel):
     )
     allowed_origins: list[str] = Field(default_factory=list, max_length=50)
 
-    def to_domain(self) -> "WidgetConfig":
-        from tfm_rag.domain.value_objects.widget_config import WidgetConfig
+    def to_domain(self) -> WidgetConfig:
         return WidgetConfig.from_dict(self.model_dump())
 
 
@@ -134,7 +134,6 @@ class WidgetConfigOut(BaseModel):
 
     @classmethod
     def from_domain(cls, raw: dict[str, Any]) -> "WidgetConfigOut":
-        from tfm_rag.domain.value_objects.widget_config import WidgetConfig
         # Use VO's tolerant from_dict so legacy partial rows still work.
         vo = WidgetConfig.from_dict(raw or {})
         return cls(**vo.to_dict())
@@ -261,7 +260,9 @@ async def patch_(
             llm_selection=body.llm_selection.to_vo() if body.llm_selection else None,
             kb_ids=body.kb_ids,
             pipeline_config=body.pipeline_config.to_vo() if body.pipeline_config else None,
-            widget_config=body.widget_config.to_domain() if body.widget_config is not None else None,
+            widget_config=(
+                body.widget_config.to_domain() if body.widget_config is not None else None
+            ),
         )
     except ChatbotNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

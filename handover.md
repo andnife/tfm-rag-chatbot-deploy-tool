@@ -1,7 +1,7 @@
 # Handover — sesión de brainstorming TFM RAG Platform
 
-**Última actualización:** 2026-05-24, sesión 8 (plan #17 EVAL-RAGAS en curso — Tasks 1-4/6 implementadas y commiteadas. Faltan Task 5 CLI + Task 6 integration e2e + cleanup. 159 unit tests passing. 12 plans tagged. Stack Docker vivo durante la sesión).
-**Continuación:** terminar plan #17 (Tasks 5 + 6 + cleanup) o cambiar de plan según prioridad. Stack Docker debe estar arriba para Task 6.
+**Última actualización:** 2026-05-28, code review completo de las 6 ramas stacked PR (m1-infra → m6-eval). Se encontraron 6 issues críticos, 9 altos, 16 medios. Se crearon 6 ramas de fix (`fix/m1-infra-reviews` → `fix/m6-eval-reviews`) y se hizo push a origin. Pendiente de revisar y mergear los fixes a las ramas de PR.
+**Continuación:** revisar los 6 branches de fix, mergear a las ramas de PR correspondientes, o refinar los fixes según feedback. El documento de hallazgos completo está en `CODE_REVIEW_REPORT.md` (en rama `fix/m1-infra-reviews`).
 
 Este documento es el punto de entrada para retomar el trabajo. Si lo estás leyendo en una sesión nueva: empieza aquí, no por el `.log`.
 
@@ -257,6 +257,50 @@ Grafo de deps del Bloque 1 (sin ciclos): PERSISTENCE → raíz; TENANT-ISOLATION
 Arrancar **Bloque 2 de iteración 2** — fichas detalladas (id, nombre, ámbito, descripción, deps, use cases, non-goals) para los 6 CAPs de **Definición del chatbot**: `CAP-KB-LIFECYCLE`, `CAP-KB-DOC-SOURCES`, `CAP-KB-DB-SOURCES`, `CAP-CHATBOT-LIFECYCLE`, `CAP-CHATBOT-WIDGET-CONFIG`, `CAP-WIDGET-RUNTIME`.
 
 Tras Bloque 2 → Bloque 3 (CHAT + EVAL, 5 fichas). Al cierre de §7, pasar a §8.
+
+---
+
+## 11. Code Review — 2026-05-28
+
+### Resumen
+
+Se hizo code review de las 6 ramas stacked PR (`m1-infra` → `m6-eval`) contra `main`. El reporte completo está en `CODE_REVIEW_REPORT.md`.
+
+### Ramas de fix creadas (pushed a origin)
+
+| Rama | Base | Fixes aplicados |
+|------|------|-----------------|
+| `fix/m1-infra-reviews` | `m1-infra` | upsert roto, SSRF, Google OAuth duplicados, health endpoint, race condition, JSON injection, password validation, user enumeration |
+| `fix/m2-docs-reviews` | `m2-docs` | path traversal LocalStorage, upload size limit, background ingestion error handling, chunker duplicates |
+| `fix/m3-chat-reviews` | `m3-chat` | agent loop context budget, N+1 queries, prompt injection defense, max_tokens limit |
+| `fix/m4-sql-reviews` | `m4-sql` | CTE-DML bypass, regex false positives, system_prompt injection, docstring |
+| `fix/m5-widget-reviews` | `m5-widget` | CORS echo-back deny, public chat validation, CORS middleware headers, HTTPS-only origins |
+| `fix/m6-eval-reviews` | `m6-eval` | report filename timestamps, dataset strip whitespace, langchain-ollama pin |
+
+### Issues críticos corregidos
+
+1. **CTE-DML bypass** (`sql_safety.py`) — regex no detectaba DML dentro de CTEs
+2. **Path traversal** (`LocalStorage.load/delete`) — storage_uri sin validación de root
+3. **CORS echo-back** (`widget_cors.py`) — allowed_origins vacío retornaba cualquier origin
+4. **Google OAuth duplicados** (`login_with_google.py) — creaba 2do usuario en vez de vincular
+5. **SSRF** (`test_credential.py) — base_url apuntaba a IPs privadas/metadata
+6. **Upsert roto** (`upsert_provider_credential.py) — siempre creaba, nunca actualizaba
+
+### Próximos pasos
+
+1. Revisar cada rama de fix (`git diff origin/<rama-base>..fix/<rama>-reviews`)
+2. Si los fixes son correctos, mergear a las ramas de PR correspondientes
+3. Si se necesita ajuste, hacer commits adicionales en las ramas de fix
+4. Los fixes están diseñados para ser atómicos — cada commit es un fix independiente
+
+### Documento de hallazgos
+
+`CODE_REVIEW_REPORT.md` en la rama `fix/m1-infra-reviews` contiene el reporte completo con:
+- 6 issues críticos (arreglados)
+- 9 issues altos (arreglados)
+- 16 issues medios (arreglados)
+- 2 issues de dependencias (arreglados)
+- 8 issues bajos (documentados, no fixeados — son mejoras de código)
 
 ---
 

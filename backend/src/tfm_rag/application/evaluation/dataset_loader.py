@@ -55,9 +55,9 @@ def load_evaluation_dataset(
                 continue
             obj = _parse_line(line_no, raw)
             case = EvaluationCase(
-                question=str(obj["question"]),
-                ground_truth=str(obj["ground_truth"]),
-                scenario=str(obj["scenario"]),
+                question=str(obj["question"]).strip(),
+                ground_truth=str(obj["ground_truth"]).strip(),
+                scenario=str(obj["scenario"]).strip(),
                 metadata=dict(obj.get("metadata") or {}),
             )
             if scenario_filter and case.scenario != scenario_filter:

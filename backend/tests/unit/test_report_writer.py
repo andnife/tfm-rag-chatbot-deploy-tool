@@ -47,8 +47,12 @@ def test_write_report_emits_report_json_and_md(tmp_path: Path) -> None:
 
     assert paths.json_path.exists()
     assert paths.markdown_path.exists()
-    assert paths.json_path.name == "report.json"
-    assert paths.markdown_path.name == "report.md"
+    # Filenames include a timestamp suffix (report_YYYYMMDD_HHMMSS.json/md)
+    # to prevent silent overwrites of prior runs in the same directory.
+    assert paths.json_path.name.startswith("report_")
+    assert paths.json_path.suffix == ".json"
+    assert paths.markdown_path.name.startswith("report_")
+    assert paths.markdown_path.suffix == ".md"
 
     data = json.loads(paths.json_path.read_text(encoding="utf-8"))
     assert data["chatbot_name"] == "HistoryBot"

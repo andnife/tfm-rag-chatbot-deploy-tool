@@ -53,9 +53,9 @@ from tfm_rag.domain.errors.knowledge import (
 from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
 from tfm_rag.infrastructure.api.dependencies import (
-    get_session_factory,  # noqa: PLC2701
     get_current_context,
     get_session,
+    get_session_factory,  # noqa: PLC2701
 )
 from tfm_rag.infrastructure.chunkers.fixed_size import FixedSizeChunker
 from tfm_rag.infrastructure.document_loaders.dispatcher import LoaderDispatcher

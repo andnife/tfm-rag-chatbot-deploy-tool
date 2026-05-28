@@ -44,7 +44,20 @@ class NonOverwritingCORSMiddleware(CORSMiddleware):
         headers = MutableHeaders(scope=message)
         if "access-control-allow-origin" in headers:
             # Route already decided; do NOT overwrite with the wildcard.
-            # We still call the original `send` so the message is forwarded.
+            # But we still need to ensure the other CORS headers are present
+            # so preflight responses work correctly in browsers.
+            if "access-control-allow-methods" not in headers:
+                headers.append(
+                    "access-control-allow-methods",
+                    ", ".join(self.allow_methods),
+                )
+            if "access-control-allow-headers" not in headers:
+                headers.append(
+                    "access-control-allow-headers",
+                    ", ".join(self.allow_headers),
+                )
+            if "vary" not in headers:
+                headers.append("vary", "Origin")
             await send(message)
             return
 

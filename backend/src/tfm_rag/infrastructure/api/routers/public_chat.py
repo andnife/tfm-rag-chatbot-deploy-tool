@@ -15,7 +15,7 @@ via `resolve_allowed_origin` (see `application/chat/widget_cors.py`).
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tfm_rag.application.chat.widget_cors import resolve_allowed_origin
@@ -114,7 +114,7 @@ from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore  # noq
 class PublicChatIn(BaseModel):
     session_id: str | None = None
     public_session_cookie: str
-    message: str
+    message: str = Field(..., min_length=1, max_length=8000)
 
 
 @router.post("/{public_key}/chat", response_model=ChatOut)

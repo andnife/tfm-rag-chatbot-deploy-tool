@@ -17,13 +17,18 @@ _THEMES: tuple[str, ...] = ("light", "dark")
 _POSITIONS: tuple[str, ...] = ("bottom-right", "bottom-left")
 
 _HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
-# A permissive origin matcher: scheme + host (+ optional port). No path,
+# HTTPS-only origin matcher: scheme + host (+ optional port). No path,
 # no fragment, no query. Wildcard '*' is accepted as a separate sentinel.
+# HTTP origins are rejected to prevent credentials transit in cleartext.
 _ORIGIN_RE = re.compile(
-    r"^https?://"
+    r"^https://"
     r"(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)*"
     r"[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?"
     r"(?::\d{1,5})?$"
+)
+# Also accept localhost with http for local development.
+_ORIGIN_DEV_RE = re.compile(
+    r"^https?://localhost(?::\d{1,5})?$"
 )
 
 _MAX_TITLE = 60
@@ -135,8 +140,9 @@ def _validate_origins(origins: tuple[str, ...]) -> None:
     for o in origins:
         if o == "*":
             continue
-        if not _ORIGIN_RE.match(o):
-            raise ValidationError(
-                f"allowed_origins entry {o!r} is not a valid origin "
-                f"(must be like 'https://host' or 'http://host:port', no path/query)"
-            )
+        if _ORIGIN_RE.match(o) or _ORIGIN_DEV_RE.match(o):
+            continue
+        raise ValidationError(
+            f"allowed_origins entry {o!r} is not a valid origin "
+            f"(must be https://host or http://localhost:port, no path/query)"
+        )

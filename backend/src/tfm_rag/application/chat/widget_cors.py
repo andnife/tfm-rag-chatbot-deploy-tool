@@ -23,7 +23,8 @@ def resolve_allowed_origin(
 
     Rules:
       * No `Origin` header in the request → return None.
-      * `allowed_origins` is empty (owner didn't restrict) → echo request_origin.
+      * `allowed_origins` is empty (owner didn't restrict) → return None
+        (deny by default to prevent cross-origin abuse).
       * `*` is in the list → echo request_origin.
       * request_origin matches an entry exactly (case-sensitive, port/scheme
         included) → echo request_origin.
@@ -33,7 +34,7 @@ def resolve_allowed_origin(
         return None
     allowed_tuple = tuple(allowed_origins)
     if not allowed_tuple:
-        return request_origin
+        return None
     if "*" in allowed_tuple:
         return request_origin
     if request_origin in allowed_tuple:

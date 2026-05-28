@@ -20,7 +20,7 @@ from tfm_rag.domain.catalog.llm_providers import (
     LLM_PROVIDER_CATALOG,
     LLMProviderDescriptor,
 )
-from tfm_rag.domain.errors.common import ValidationError
+from tfm_rag.domain.errors.common import NotFoundError, ValidationError
 from tfm_rag.domain.errors.integrations import CredentialNotFoundError
 from tfm_rag.infrastructure.api.dependencies import (
     get_current_context,
@@ -128,10 +128,10 @@ async def delete_(
 ) -> None:
     try:
         await delete_credential(session, ctx, credential_id=credential_id)
-    except Exception as exc:
+    except NotFoundError:
         raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+            status.HTTP_404_NOT_FOUND, detail="Credential not found"
+        ) from None
 
 
 @router.post("/credentials/{credential_id}/test")

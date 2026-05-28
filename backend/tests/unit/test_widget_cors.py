@@ -5,14 +5,16 @@ from tfm_rag.application.chat.widget_cors import resolve_allowed_origin
 # --- empty allowed list -------------------------------------------------------
 
 
-def test_empty_allowed_origins_allows_any_request_origin() -> None:
-    # The chatbot owner didn't restrict origins; default permissive.
+def test_empty_allowed_origins_denies_by_default() -> None:
+    # Empty allowed_origins → deny by default to prevent cross-origin abuse.
+    # Owners must opt-in by listing origins (or using "*" if they explicitly
+    # want any origin echoed back).
     assert (
         resolve_allowed_origin(
             request_origin="https://acme.example.com",
             allowed_origins=(),
         )
-        == "https://acme.example.com"
+        is None
     )
 
 

@@ -26,6 +26,11 @@ def get_session_factory(settings: Settings) -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+# Backward-compat alias for downstream stacked branches (M2+) that still
+# import the old private name. Remove once all consumers are migrated.
+_get_factory = get_session_factory
+
+
 async def get_session(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> AsyncIterator[AsyncSession]:

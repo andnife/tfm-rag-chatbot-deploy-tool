@@ -10,7 +10,6 @@ NOTE: this is the slowest test in the repo (~3-6 minutes). It's marked
 import asyncio
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -184,9 +183,9 @@ async def test_eval_ragas_cli_produces_reports(
             stdout_b, stderr_b = await asyncio.wait_for(
                 proc.communicate(), timeout=600.0
             )
-        except asyncio.TimeoutError:
+        except TimeoutError as exc:
             proc.kill()
-            raise AssertionError("eval-ragas CLI timed out after 10 min")
+            raise AssertionError("eval-ragas CLI timed out after 10 min") from exc
         stdout = stdout_b.decode("utf-8", errors="replace")
         stderr = stderr_b.decode("utf-8", errors="replace")
 

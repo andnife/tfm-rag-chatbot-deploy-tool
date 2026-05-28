@@ -1,3 +1,4 @@
+import threading
 from collections.abc import AsyncIterator
 
 from fastapi import Depends, HTTPException, Request, status
@@ -11,20 +12,24 @@ from tfm_rag.infrastructure.persistence.repository import RequestContext
 from tfm_rag.infrastructure.settings import Settings, get_settings
 
 _session_factory: async_sessionmaker[AsyncSession] | None = None
+_factory_lock = threading.Lock()
 
 
-def _get_factory(settings: Settings) -> async_sessionmaker[AsyncSession]:
+def get_session_factory(settings: Settings) -> async_sessionmaker[AsyncSession]:
+    """Return the singleton session factory, creating it on first call."""
     global _session_factory
     if _session_factory is None:
-        engine = build_engine(settings.postgres_url)
-        _session_factory = build_session_factory(engine)
+        with _factory_lock:
+            if _session_factory is None:
+                engine = build_engine(settings.postgres_url)
+                _session_factory = build_session_factory(engine)
     return _session_factory
 
 
 async def get_session(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> AsyncIterator[AsyncSession]:
-    factory = _get_factory(settings)
+    factory = get_session_factory(settings)
     async with factory() as session:
         try:
             yield session

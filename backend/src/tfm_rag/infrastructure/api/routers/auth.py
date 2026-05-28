@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tfm_rag.application.auth.login_user import login_user
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 class RegisterIn(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
 
 
 class LoginIn(BaseModel):
@@ -59,8 +59,10 @@ async def register(
         result = await register_user(
             session, email=body.email, password=body.password
         )
-    except UserAlreadyExistsError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except UserAlreadyExistsError:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="Registration failed"
+        ) from None
     return AuthOut(
         user_id=str(result.user_id),
         tenant_id=str(result.tenant_id),
@@ -81,10 +83,10 @@ async def login(
         result = await login_user(
             session, email=body.email, password=body.password
         )
-    except InvalidCredentialsError as exc:
+    except InvalidCredentialsError:
         raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, detail=str(exc)
-        ) from exc
+            status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+        ) from None
     return AuthOut(
         user_id=str(result.user_id),
         tenant_id=str(result.tenant_id),

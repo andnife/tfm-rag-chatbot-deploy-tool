@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from tfm_rag.domain.value_objects.evaluation_report import EvaluationReport
@@ -43,7 +44,7 @@ def _format_markdown(report: EvaluationReport) -> str:
     lines.append("| --- | --- |")
     for metric in _REPORTED_METRICS:
         value = report.summary.metrics.get(metric)
-        cell = f"{value:.3f}" if value is not None else "—"
+        cell = f"{value:.3f}" if value is not None else "-"
         lines.append(f"| {metric} | {cell} |")
     lines.append("")
 
@@ -55,7 +56,7 @@ def _format_markdown(report: EvaluationReport) -> str:
         lines.append("")
         for case in top:
             score = (case.scores or {}).get(metric)
-            score_cell = f"{score:.3f}" if score is not None else "—"
+            score_cell = f"{score:.3f}" if score is not None else "-"
             preview = case.predicted_answer or "(no answer)"
             if len(preview) > 200:
                 preview = preview[:200] + "..."
@@ -71,13 +72,16 @@ def write_report(
     *,
     output_dir: Path,
 ) -> ReportPaths:
-    """Serialise a report to ``output_dir``: ``report.json`` (machine) +
-    ``report.md`` (human). Creates ``output_dir`` if it doesn't exist.
+    """Serialise a report to ``output_dir``: ``report_<timestamp>.json`` +
+    ``report_<timestamp>.md``. Creates ``output_dir`` if it doesn't exist.
+    Files include a timestamp to prevent silent overwrites.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "report.json"
-    md_path = output_dir / "report.md"
+
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    json_path = output_dir / f"report_{ts}.json"
+    md_path = output_dir / f"report_{ts}.md"
 
     json_path.write_text(
         json.dumps(report.to_dict(), indent=2, ensure_ascii=False),

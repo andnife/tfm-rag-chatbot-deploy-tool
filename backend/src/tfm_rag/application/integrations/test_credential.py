@@ -34,14 +34,15 @@ def _validate_base_url(url: str) -> None:
     for prefix in _BLOCKED_NETWORKS:
         if hostname.startswith(prefix) or hostname == prefix.rstrip("."):
             raise ValidationError(
-                f"base_url指向私有网络或元数据端点，已被拒绝: {url}"
+                f"base_url points to a private network or metadata "
+                f"endpoint; rejected: {url}"
             )
     # Also block IP addresses in private ranges
     try:
         addr = ip_address(hostname)
         if addr.is_private or addr.is_loopback or addr.is_link_local:
             raise ValidationError(
-                f"base_url指向私有IP地址，已被拒绝: {url}"
+                f"base_url points to a private IP address; rejected: {url}"
             )
     except ValueError:
         pass  # Not an IP address, hostname-based check above is sufficient

@@ -53,7 +53,7 @@ from tfm_rag.domain.errors.knowledge import (
 from tfm_rag.domain.value_objects.chunking_config import ChunkingConfig
 from tfm_rag.domain.value_objects.embedding_selection import EmbeddingSelection
 from tfm_rag.infrastructure.api.dependencies import (
-    _get_factory,  # noqa: PLC2701
+    get_session_factory,  # noqa: PLC2701
     get_current_context,
     get_session,
 )
@@ -79,6 +79,8 @@ from tfm_rag.infrastructure.vector_store.qdrant_client import (
 )
 
 router = APIRouter(prefix="/api/knowledge-bases", tags=["knowledge"])
+
+_MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 class ChunkingConfigIn(BaseModel):
@@ -364,16 +366,46 @@ async def _ingest_in_background(
                     IngestionJobRow.id == job_id,
                     IngestionJobRow.tenant_id == tenant_id,
                 )
-            )).scalar_one()
+            )).scalar_one_or_none()
+            if job is None:
+                return  # Job was deleted or tenant mismatch — abort silently.
+
             source = (await session.execute(
                 select(SourceRow).where(SourceRow.id == job.source_id)
-            )).scalar_one()
+            )).scalar_one_or_none()
+            if source is None:
+                async with factory() as s_err:
+                    await s_err.execute(
+                        update(IngestionJobRow)
+                        .where(IngestionJobRow.id == job_id)
+                        .values(
+                            status="failed",
+                            error="Source not found (may have been deleted)",
+                            finished_at=datetime.now(UTC),
+                        )
+                    )
+                    await s_err.commit()
+                return
+
             kb = (await session.execute(
                 select(KnowledgeBaseRow).where(
                     KnowledgeBaseRow.id == source.kb_id,
                     KnowledgeBaseRow.tenant_id == tenant_id,
                 )
-            )).scalar_one()
+            )).scalar_one_or_none()
+            if kb is None:
+                async with factory() as s_err:
+                    await s_err.execute(
+                        update(IngestionJobRow)
+                        .where(IngestionJobRow.id == job_id)
+                        .values(
+                            status="failed",
+                            error="Knowledge base not found (may have been deleted)",
+                            finished_at=datetime.now(UTC),
+                        )
+                    )
+                    await s_err.commit()
+                return
 
             chunking = ChunkingConfig.from_dict(kb.chunking_config)
             selection = EmbeddingSelection.from_dict(kb.embedding_selection)
@@ -486,7 +518,12 @@ async def upload_document_(
     ctx: RequestContext = Depends(get_current_context),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> UploadDocOut:
-    content = await file.read()
+    content = await file.read(_MAX_UPLOAD_BYTES + 1)
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large: max {_MAX_UPLOAD_BYTES // (1024*1024)} MB",
+        )
     name = filename or file.filename or "document"
     mime = file.content_type or "application/octet-stream"
     try:
@@ -519,7 +556,7 @@ async def upload_document_(
     # get_session will call commit() again on the already-clean session (no-op).
     await session.commit()
 
-    factory = _get_factory(settings)
+    factory = get_session_factory(settings)
     runner = JobsRunner(background_tasks)
 
     async def _kick() -> None:
@@ -576,7 +613,7 @@ async def reindex_source_(
     # Commit explicitly so the background task can read the row via a new session.
     await session.commit()
 
-    factory = _get_factory(settings)
+    factory = get_session_factory(settings)
     runner = JobsRunner(background_tasks)
 
     async def _kick() -> None:

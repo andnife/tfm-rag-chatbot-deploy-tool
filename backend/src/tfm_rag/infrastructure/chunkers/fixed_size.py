@@ -17,27 +17,20 @@ class FixedSizeChunker:
         size = config.chunk_size
         stride = size - config.chunk_overlap
         chunks: list[Chunk] = []
-        i = 0
         index = 0
         n = len(text)
+        i = 0
         while i < n:
+            end = min(i + size, n)
             chunks.append(
                 Chunk(
                     index=index,
-                    text=text[i : i + size],
-                    metadata={"chunk_start": i, "chunk_end": min(i + size, n)},
+                    text=text[i:end],
+                    metadata={"chunk_start": i, "chunk_end": end},
                 )
             )
             index += 1
-            i += stride
-            if i + size >= n and i + stride < n:
-                # Final partial window
-                chunks.append(
-                    Chunk(
-                        index=index,
-                        text=text[i:n],
-                        metadata={"chunk_start": i, "chunk_end": n},
-                    )
-                )
+            if end == n:
                 break
+            i += stride
         return chunks

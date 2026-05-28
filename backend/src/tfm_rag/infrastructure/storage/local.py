@@ -2,6 +2,8 @@ import asyncio
 from pathlib import Path
 from uuid import UUID
 
+_MAX_FILENAME_LEN = 255
+
 
 class LocalStorage:
     """Filesystem-backed Storage adapter.
@@ -13,7 +15,7 @@ class LocalStorage:
     """
 
     def __init__(self, root: str) -> None:
-        self._root = Path(root)
+        self._root = Path(root).resolve()
         self._root.mkdir(parents=True, exist_ok=True)
 
     def _path_for(
@@ -21,12 +23,26 @@ class LocalStorage:
     ) -> Path:
         if "/" in filename or "\\" in filename or filename in {".", ".."}:
             raise ValueError(f"Invalid filename: {filename!r}")
+        if "\x00" in filename:
+            raise ValueError("Filename contains null byte")
+        if len(filename) > _MAX_FILENAME_LEN:
+            raise ValueError(f"Filename too long: {len(filename)} > {_MAX_FILENAME_LEN}")
         return (
             self._root
             / f"tenant_{tenant_id}"
             / str(source_id)
             / filename
         )
+
+    def _assert_within_root(self, path: Path) -> None:
+        """Raise if path escapes the storage root (path traversal guard)."""
+        resolved = path.resolve()
+        try:
+            resolved.relative_to(self._root)
+        except ValueError:
+            raise ValueError(
+                f"Storage path escapes root: {resolved} is outside {self._root}"
+            ) from None
 
     async def save(
         self,
@@ -49,10 +65,12 @@ class LocalStorage:
 
     async def load(self, storage_uri: str) -> bytes:
         path = Path(storage_uri.removeprefix("file://"))
+        self._assert_within_root(path)
         return await asyncio.to_thread(path.read_bytes)
 
     async def delete(self, storage_uri: str) -> None:
         path = Path(storage_uri.removeprefix("file://"))
+        self._assert_within_root(path)
 
         def _delete() -> None:
             if not path.exists():

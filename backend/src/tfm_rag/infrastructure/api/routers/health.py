@@ -5,10 +5,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from tfm_rag.infrastructure.persistence.engine import (
-    build_engine,
-    build_session_factory,
-)
+from tfm_rag.infrastructure.api.dependencies import get_session_factory
 from tfm_rag.infrastructure.settings import Settings, get_settings
 from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore
 
@@ -30,13 +27,11 @@ class HealthResponse(BaseModel):
 async def health(settings: Settings = Depends(get_settings)) -> HealthResponse:  # noqa: B008
     components: list[ComponentHealth] = []
 
-    # Postgres
+    # Postgres — reuse the application engine
     try:
-        engine = build_engine(settings.postgres_url)
-        factory = build_session_factory(engine)
+        factory = get_session_factory(settings)
         async with factory() as session:
             await session.execute(text("SELECT 1"))
-        await engine.dispose()
         components.append(ComponentHealth(name="postgres", status="ok"))
     except Exception as e:  # noqa: BLE001
         components.append(

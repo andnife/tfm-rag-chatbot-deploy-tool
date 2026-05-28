@@ -66,7 +66,7 @@ class LLMSelectionIn(BaseModel):
 class GenerationConfigIn(BaseModel):
     temperature: float = 0.2
     top_p: float = 1.0
-    max_tokens: int = Field(default=1024, ge=1, le=32_000)
+    max_tokens: int = Field(default=1024, ge=1, le=4_096)
 
     def to_vo(self) -> GenerationConfig:
         return GenerationConfig(

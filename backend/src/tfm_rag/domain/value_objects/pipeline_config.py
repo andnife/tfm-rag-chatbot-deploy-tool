@@ -32,9 +32,9 @@ class GenerationConfig:
             raise ValidationError(
                 f"top_p must be in (0, 1], got {self.top_p}"
             )
-        if not (1 <= self.max_tokens <= 32_000):
+        if not (1 <= self.max_tokens <= 4_096):
             raise ValidationError(
-                f"max_tokens must be in [1, 32000], got {self.max_tokens}"
+                f"max_tokens must be in [1, 4096], got {self.max_tokens}"
             )
 
     def to_dict(self) -> dict[str, Any]:

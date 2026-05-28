@@ -1,3 +1,4 @@
+import json
 from collections.abc import Awaitable, Callable
 from uuid import UUID
 
@@ -43,16 +44,20 @@ class TenantScopingMiddleware(BaseHTTPMiddleware):
         auth = request.headers.get("authorization", "")
         if not auth.lower().startswith("bearer "):
             return Response(
-                content='{"error":{"code":"unauthenticated","message":"Missing Bearer token"}}',
+                content=json.dumps(
+                    {"error": {"code": "unauthenticated", "message": "Missing Bearer token"}}
+                ),
                 status_code=401,
                 media_type="application/json",
             )
         token = auth.split(" ", 1)[1].strip()
         try:
             payload = decode_jwt(token, self._settings.jwt_secret)
-        except TokenInvalidError as exc:
+        except TokenInvalidError:
             return Response(
-                content=f'{{"error":{{"code":"unauthenticated","message":"{exc}"}}}}',
+                content=json.dumps(
+                    {"error": {"code": "unauthenticated", "message": "Invalid token"}}
+                ),
                 status_code=401,
                 media_type="application/json",
             )

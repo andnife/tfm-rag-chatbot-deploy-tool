@@ -5,7 +5,16 @@ are attached to the chatbot's KBs we append a markdown block listing
 each source's tables/columns + its source_id, so the LLM has enough
 context to author SELECT queries via the `query_database` tool.
 """
+import re
 from typing import Any
+
+
+def _sanitize_identifier(value: str) -> str:
+    """Strip characters that could break out of the markdown block or
+    inject adversarial content into the system prompt.
+    """
+    # Remove backticks, quotes, semicolons, and newlines.
+    return re.sub(r"[`'\";\n\r]", "", value)
 
 
 def build_chatbot_system_prompt(
@@ -27,20 +36,20 @@ def build_chatbot_system_prompt(
     blocks: list[str] = []
     for src in db_only:
         payload = src.get("payload") or {}
-        driver = payload.get("driver", "?")
-        db_name = payload.get("db_name", "?")
+        driver = _sanitize_identifier(str(payload.get("driver", "?")))
+        db_name = _sanitize_identifier(str(payload.get("db_name", "?")))
         source_id = src.get("source_id") or src.get("id")
         snapshot = (payload.get("schema_snapshot") or {})
         tables = snapshot.get("tables") or []
         table_lines: list[str] = []
         for t in tables:
-            schema = t.get("schema", "?")
-            name = t.get("name", "?")
+            schema = _sanitize_identifier(str(t.get("schema", "?")))
+            name = _sanitize_identifier(str(t.get("name", "?")))
             cols = t.get("columns") or []
             col_parts: list[str] = []
             for c in cols:
-                cname = c.get("name", "?")
-                ctype = c.get("data_type", "?")
+                cname = _sanitize_identifier(str(c.get("name", "?")))
+                ctype = _sanitize_identifier(str(c.get("data_type", "?")))
                 nullable = "" if c.get("nullable") else " NOT NULL"
                 col_parts.append(f"{cname} {ctype}{nullable}")
             joined_cols = ", ".join(col_parts) if col_parts else "(no columns)"

@@ -21,14 +21,47 @@ _LEADING_VERB_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Banned tokens that, if present ANYWHERE in the SQL, indicate a
-# multi-statement or DML attempt. Whole-word boundaries reduce false
-# positives (e.g. "deleted_at" as a column name is fine).
+# Banned tokens that, if present ANYWHERE in the SQL (after stripping
+# comments and string literals), indicate a multi-statement or DML
+# attempt. Whole-word boundaries reduce false positives.
 _BANNED_TOKEN_RE = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|"
     r"REPLACE|MERGE|CALL|EXEC|EXECUTE|VACUUM|ANALYZE)\b",
     re.IGNORECASE,
 )
+
+# Matches SQL single-line comments (-- ...) to strip them before scanning.
+_COMMENT_RE = re.compile(r"--[^\n]*", re.IGNORECASE)
+
+# Matches SQL string literals ('...') to strip them before scanning.
+_STRING_LITERAL_RE = re.compile(r"'[^']*'", re.IGNORECASE)
+
+# Matches CTE definitions to check for DML inside them.
+# Pattern: WITH name AS ( ... ) — captures the content inside parentheses.
+_CTE_BODY_RE = re.compile(
+    r"\bWITH\b[^)]*\bAS\b\s*\((.+)\)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _strip_comments_and_strings(sql: str) -> str:
+    """Remove SQL comments and string literals so banned-token scanning
+    doesn't false-positive on content inside comments or strings.
+    """
+    sql = _COMMENT_RE.sub("", sql)
+    sql = _STRING_LITERAL_RE.sub("''", sql)
+    return sql
+
+
+def _check_cte_for_dml(sql: str) -> None:
+    """Reject WITH ... AS (...) if the CTE body contains DML keywords."""
+    for m in _CTE_BODY_RE.finditer(sql):
+        cte_content = m.group(1)
+        dml_match = _BANNED_TOKEN_RE.search(cte_content)
+        if dml_match is not None:
+            raise UnsafeSQLError(
+                f"DML keyword '{dml_match.group(0).upper()}' found inside CTE body"
+            )
 
 
 def assert_select_only(sql: str) -> None:
@@ -36,7 +69,9 @@ def assert_select_only(sql: str) -> None:
 
     Rules:
       * Leading non-whitespace token must be SELECT or WITH.
-      * Must not contain banned mutating verbs as standalone tokens.
+      * Must not contain banned mutating verbs as standalone tokens
+        (after stripping comments and string literals).
+      * CTE bodies must not contain DML keywords.
       * Must not contain ';' followed by additional non-whitespace
         characters (i.e. no second statement).
     """
@@ -49,7 +84,12 @@ def assert_select_only(sql: str) -> None:
             f"only SELECT (or WITH … SELECT) statements are allowed; got {first}"
         )
 
-    match = _BANNED_TOKEN_RE.search(sql)
+    # Check CTE bodies for DML before general banned-token scan.
+    _check_cte_for_dml(sql)
+
+    # Strip comments and string literals before scanning for banned tokens.
+    cleaned = _strip_comments_and_strings(sql)
+    match = _BANNED_TOKEN_RE.search(cleaned)
     if match is not None:
         raise UnsafeSQLError(
             f"banned SQL token detected: {match.group(0).upper()}"

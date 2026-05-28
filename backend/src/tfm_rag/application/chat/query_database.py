@@ -1,9 +1,9 @@
 """query_database — application use case dispatched from the agent loop.
 
 Resolves a database source by id (scoped to the chatbot's allowed KBs),
-decrypts the credentials, runs the SQL via the matching connector. Does
-NOT validate the SQL itself — that's `sql_safety.assert_select_only`,
-which is called inside the use case.
+decrypts the credentials, runs the SQL via the matching connector. SQL is
+validated via `sql_safety.assert_select_only` before dispatching to the
+connector.
 """
 import base64
 from dataclasses import dataclass

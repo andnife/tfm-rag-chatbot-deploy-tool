@@ -53,7 +53,7 @@ class TenantScopingMiddleware(BaseHTTPMiddleware):
         token = auth.split(" ", 1)[1].strip()
         try:
             payload = decode_jwt(token, self._settings.jwt_secret)
-        except TokenInvalidError as exc:
+        except TokenInvalidError:
             return Response(
                 content=json.dumps(
                     {"error": {"code": "unauthenticated", "message": "Invalid token"}}

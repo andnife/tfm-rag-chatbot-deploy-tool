@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tfm_rag.domain.catalog.llm_providers import LLM_PROVIDER_CATALOG
@@ -46,6 +47,25 @@ async def upsert_provider_credential(
         )
 
     repo = ProviderCredentialRepository(session, ctx)
+
+    # Check for existing credential with same (provider_id, label).
+    stmt = select(ProviderCredentialRow).where(
+        ProviderCredentialRow.tenant_id == ctx.tenant_id,
+        ProviderCredentialRow.provider_id == provider_id,
+        ProviderCredentialRow.label == label,
+    )
+    existing = (await session.execute(stmt)).scalar_one_or_none()
+
+    if existing is not None:
+        existing.api_key_encrypted = encryptor.encrypt(api_key.encode("utf-8"))
+        existing.base_url = base_url
+        await session.flush()
+        return UpsertResult(
+            id=existing.id,
+            provider_id=existing.provider_id,
+            label=existing.label,
+        )
+
     row = ProviderCredentialRow(
         id=uuid4(),
         tenant_id=ctx.tenant_id,

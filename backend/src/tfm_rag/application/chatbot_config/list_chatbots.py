@@ -32,8 +32,8 @@ async def list_chatbots(
 ) -> list[ChatbotView]:
     repo = chatbot_repo_factory(session, ctx)
     rows = await repo.list(limit=limit, offset=offset)
-    views: list[ChatbotView] = []
-    for row in rows:
-        kb_ids = await repo.list_kb_ids(row.id)
-        views.append(_to_view(row, kb_ids))
-    return views
+    if not rows:
+        return []
+    # Batch-fetch KB IDs to avoid N+1 queries.
+    kb_ids_map = await repo.list_kb_ids_batch([r.id for r in rows])
+    return [_to_view(row, kb_ids_map.get(row.id, [])) for row in rows]

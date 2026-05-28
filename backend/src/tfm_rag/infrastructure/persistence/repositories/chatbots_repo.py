@@ -28,6 +28,21 @@ class ChatbotRepository(BaseRepository[ChatbotRow]):
         )
         return list((await self._session.execute(stmt)).scalars().all())
 
+    async def list_kb_ids_batch(
+        self, chatbot_ids: list[UUID]
+    ) -> dict[UUID, list[UUID]]:
+        """Return {chatbot_id: [kb_ids]} for multiple chatbots in one query."""
+        if not chatbot_ids:
+            return {}
+        stmt = select(ChatbotKnowledgeBaseRow).where(
+            ChatbotKnowledgeBaseRow.chatbot_id.in_(chatbot_ids),
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        result: dict[UUID, list[UUID]] = {cid: [] for cid in chatbot_ids}
+        for row in rows:
+            result[row.chatbot_id].append(row.kb_id)
+        return result
+
     async def replace_kb_links(
         self, chatbot_id: UUID, kb_ids: list[UUID]
     ) -> None:

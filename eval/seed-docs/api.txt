@@ -1,0 +1,32 @@
+RAG Platform — Guia rapida de la API
+
+Auth:
+- POST /api/auth/register: crear cuenta (email + password, min 8 chars).
+- POST /api/auth/login: devuelve JWT.
+- GET  /api/auth/me: usuario autenticado.
+
+Knowledge Bases:
+- POST /api/knowledge-bases: crear KB con embedding y chunking.
+- POST /api/knowledge-bases/{id}/sources/documents: subir documento.
+- POST /api/knowledge-bases/{id}/sources/databases: conectar DB SQL.
+- POST /api/knowledge-bases/{id}/search: busqueda semantica.
+
+Chatbots:
+- POST /api/chatbots: crear chatbot.
+- POST /api/chatbots/{id}/chat: enviar mensaje.
+- GET  /api/chatbots/{id}/sessions: listar sesiones.
+
+Widget publico (sin JWT):
+- GET  /api/public/chatbots/{public_key}/config
+- POST /api/public/chatbots/{public_key}/chat
+
+El widget JS embebible se carga con:
+  <script src="/widget/widget.js" data-public-key="wgt_xxx" async></script>
+
+El widget mantiene una sesión por visitante usando localStorage. El token
+JWT no es necesario en las rutas /api/public/* — solo la public_key del
+chatbot identifica al cliente.
+
+Multi-tenant: cada usuario al registrarse recibe un tenant_id automatico.
+Todas las KBs, chatbots y sesiones quedan aisladas por tenant. Esto se
+implementa con un middleware que inyecta el tenant_id en cada query.

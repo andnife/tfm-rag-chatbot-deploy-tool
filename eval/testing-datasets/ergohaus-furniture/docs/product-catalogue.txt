@@ -1,0 +1,113 @@
+ERGOHAUS GMBH — PRODUCT CATALOGUE (2024 EDITION)
+=================================================
+
+This catalogue lists all products currently available for business customers.
+All prices are in EUR, excluding VAT (19% German VAT applies to domestic orders).
+
+---
+
+SEATING — TASK CHAIRS
+----------------------
+
+EH-C100  Baseline Task Chair
+  Description : Entry-level ergonomic task chair with height-adjustable seat and
+                synchronized tilt mechanism. Mesh back. 5-star nylon base.
+  Seat height  : 42–54 cm (gas-lift)
+  Weight limit : 120 kg
+  Colours      : Black, Anthracite
+  Price (EUR)  : 249.00
+  Warranty     : 5 years (frame & mechanism), 1 year (upholstery)
+
+EH-C200  ProComfort Task Chair
+  Description : Mid-range chair with lumbar support pad, adjustable armrests (4D),
+                and forward-tilt option. Mesh back. Polished aluminium base.
+  Seat height  : 40–56 cm
+  Weight limit : 130 kg
+  Colours      : Black, Midnight Blue, Warm Grey
+  Price (EUR)  : 449.00
+  Warranty     : 5 years (full)
+
+EH-C300  Executive ErgoFlex Chair
+  Description : Premium full-back ergonomic chair. Adaptive lumbar, headrest,
+                individually adjustable armrests (6D), forward-tilt, and seat-depth
+                adjustment. Genuine leather option available.
+  Seat height  : 38–58 cm
+  Weight limit : 150 kg
+  Colours      : Black leather, Black mesh, Cognac leather
+  Price (EUR)  : 849.00
+  Warranty     : 5 years (full)
+
+---
+
+DESKS — SIT-STAND
+------------------
+
+EH-D400  DeskRise Single-Motor
+  Description : Electric sit-stand desk, single motor. LINAK actuator. Memory
+                positions (4 presets). Anti-collision sensor.
+  Surface      : 120 × 80 cm (HDF core, melamine top)
+  Height range : 62–128 cm
+  Weight limit : 80 kg
+  Colours      : White, Black, Oak
+  Price (EUR)  : 599.00
+  Warranty     : 5 years (frame), 2 years (motor/electronics)
+
+EH-D500  DeskRise Dual-Motor
+  Description : Electric sit-stand desk, dual motor. Faster, supports heavier loads.
+                LED height display. USB-A charging port integrated into frame.
+  Surface      : 160 × 80 cm (HDF core, melamine top)
+  Height range : 60–130 cm
+  Weight limit : 120 kg
+  Colours      : White, Black, Oak, Walnut
+  Price (EUR)  : 899.00
+  Warranty     : 5 years (frame), 3 years (motor/electronics)
+
+---
+
+ACCESSORIES
+-----------
+
+EH-A10  Single Monitor Arm
+  Description : Clamp-mount, VESA 75/100. Adjustable tilt, swivel, rotation.
+                Cable management channel.
+  Load range   : 2–9 kg
+  Price (EUR)  : 89.00
+  Warranty     : 1 year
+
+EH-A20  Dual Monitor Arm
+  Description : Single-post, dual-head. Same range as EH-A10 per head.
+  Load range   : 2×2–9 kg
+  Price (EUR)  : 139.00
+  Warranty     : 1 year
+
+EH-A30  Under-Desk Cable Tray
+  Description : Steel mesh cable tray, clamp-mount, 60 cm width.
+  Price (EUR)  : 29.00
+  Warranty     : 1 year
+
+EH-A40  Keyboard Tray
+  Description : Clamp-mount keyboard tray, 70 cm width, adjustable tilt (-15° to +10°).
+                Mouse platform included on right side.
+  Price (EUR)  : 59.00
+  Warranty     : 1 year
+
+---
+
+BUNDLE OFFERS
+-------------
+
+EH-BUN-01  Home Office Starter Bundle
+  Includes     : EH-C100 + EH-D400 + EH-A30
+  Bundle price : 839.00  (saves 78.00 vs. individual)
+
+EH-BUN-02  Professional Bundle
+  Includes     : EH-C200 + EH-D500 + EH-A10 + EH-A30
+  Bundle price : 1,499.00  (saves 77.00 vs. individual)
+
+EH-BUN-03  Executive Bundle
+  Includes     : EH-C300 + EH-D500 + EH-A20 + EH-A40
+  Bundle price : 1,979.00  (saves 67.00 vs. individual)
+
+---
+
+END OF CATALOGUE

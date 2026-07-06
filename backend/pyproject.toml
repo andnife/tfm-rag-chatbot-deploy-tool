@@ -1,0 +1,125 @@
+[project]
+name = "tfm-rag-backend"
+version = "0.1.0"
+description = "RAG Chatbot Platform — backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic[email]>=2.9",
+    "pydantic-settings>=2.6",
+    "python-docx>=1.1,<2.0",
+    "python-jose[cryptography]>=3.3",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "alembic>=1.14",
+    "asyncpg>=0.30",
+    "asyncmy>=0.2.10",
+    "qdrant-client>=1.12",
+    "pypdf>=5.1",
+    "python-multipart>=0.0.9",
+    "httpx>=0.28",
+    "markdown-it-py>=3.0,<4.0",
+    "structlog>=24.4",
+    "bcrypt>=4.2",
+    "google-auth>=2.35",
+    "sqlglot>=22.0,<27.0",
+    "tiktoken>=0.7,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "coverage[toml]>=7.4,<8.0",
+    "testcontainers>=4.8",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pre-commit>=3.6,<5.0",
+    "jsonschema>=4",
+    "import-linter>=2.1,<3.0",
+]
+eval = [
+    "ragas>=0.2,<0.3",
+    "langchain-ollama>=0.2,<0.3",
+    "langchain-openai>=0.2,<0.3",
+    "langchain-community>=0.3,<0.4",
+    "datasets>=3.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tfm_rag"]
+
+[tool.coverage.run]
+source = ["src/tfm_rag/domain", "src/tfm_rag/application", "src/tfm_rag/infrastructure"]
+branch = true
+parallel = false
+
+[tool.coverage.report]
+# Measured coverage with infrastructure/ in scope is ~81.6% (unit tests
+# only); 79 keeps a ~2-point safety margin without dropping below the 70
+# floor. domain+application alone stay in the low 90s.
+fail_under = 79
+show_missing = true
+skip_covered = false
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "@overload",
+]
+
+[tool.coverage.html]
+directory = "../docs/coverage"
+
+[tool.importlinter]
+root_packages = ["tfm_rag"]
+
+[[tool.importlinter.contracts]]
+name = "Domain is independent"
+type = "forbidden"
+source_modules = ["tfm_rag.domain"]
+forbidden_modules = ["tfm_rag.application", "tfm_rag.infrastructure"]
+
+[[tool.importlinter.contracts]]
+name = "Application does not import infrastructure"
+type = "forbidden"
+source_modules = ["tfm_rag.application"]
+forbidden_modules = ["tfm_rag.infrastructure"]
+ignore_imports = [
+    # DEBT(integrations): needs provider model-lister port; see T16
+    "tfm_rag.application.integrations.list_credential_models -> tfm_rag.infrastructure.llm_providers.dispatcher",
+    "tfm_rag.application.integrations.list_credential_models -> tfm_rag.infrastructure.persistence.repositories.credentials_repo",
+    "tfm_rag.application.integrations.list_credential_models -> tfm_rag.infrastructure.persistence.repository",
+    # DEBT(integrations): needs provider connectivity-tester port; see T16
+    "tfm_rag.application.integrations.test_credential -> tfm_rag.infrastructure.persistence.repositories.credentials_repo",
+    "tfm_rag.application.integrations.test_credential -> tfm_rag.infrastructure.persistence.repository",
+    # DEBT(integrations): needs provider embedding-dimension port; see T16
+    "tfm_rag.application.integrations.probe_embedding_dimension -> tfm_rag.infrastructure.persistence.repositories.credentials_repo",
+    "tfm_rag.application.integrations.probe_embedding_dimension -> tfm_rag.infrastructure.persistence.repository",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layers"
+type = "layers"
+layers = [
+    "tfm_rag.infrastructure",
+    "tfm_rag.application",
+    "tfm_rag.domain",
+]
+ignore_imports = [
+    # DEBT(integrations): needs provider model-lister port; see T16
+    "tfm_rag.application.integrations.list_credential_models -> tfm_rag.infrastructure.llm_providers.dispatcher",
+    "tfm_rag.application.integrations.list_credential_models -> tfm_rag.infrastructure.persistence.repositories.credentials_repo",
+    "tfm_rag.application.integrations.list_credential_models -> tfm_rag.infrastructure.persistence.repository",
+    # DEBT(integrations): needs provider connectivity-tester port; see T16
+    "tfm_rag.application.integrations.test_credential -> tfm_rag.infrastructure.persistence.repositories.credentials_repo",
+    "tfm_rag.application.integrations.test_credential -> tfm_rag.infrastructure.persistence.repository",
+    # DEBT(integrations): needs provider embedding-dimension port; see T16
+    "tfm_rag.application.integrations.probe_embedding_dimension -> tfm_rag.infrastructure.persistence.repositories.credentials_repo",
+    "tfm_rag.application.integrations.probe_embedding_dimension -> tfm_rag.infrastructure.persistence.repository",
+]

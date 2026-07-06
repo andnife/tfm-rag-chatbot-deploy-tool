@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Env
+.env
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Data
+backend/data/
+storage/
+!backend/src/**/storage/
+qdrant_data/
+postgres_data/
+
+# Runtime
+*.pid
+scripts/logs/
+backend/scripts/logs/
+
+# Windows zone metadata
+*Zone.Identifier*
+
+# Coverage scratch
+backend/.coverage
+backend/.coverage.*
+
+# Agent/session scratch + worktrees (never publish)
+.claude/
+
+# Eval run outputs + review scratch (large / local-only)
+eval_runs/
+backend/eval_runs/
+eval/seeds/wikisql/
+eval/**/*.review-progress.json
+eval/testing-datasets/**/rows.reviewed.jsonl
+
+# Demo/extra content kept local only
+docs/demo-knowledge-bases/
+backend/coverage.xml
+backend/htmlcov/
+docs/coverage/
+
+# SQuAD raw download cache
+eval/seeds/squad/_*.json
+
+# Eval run artifacts (reports + live trace.jsonl), written at runtime
+backend/eval_runs/
+/eval_runs/
+
+# Local test subset datasets
+eval/*-mini.jsonl
+
+# Local dev/manual-QA data, generated at runtime
+.devdata/

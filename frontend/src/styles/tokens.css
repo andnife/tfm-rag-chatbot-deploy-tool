@@ -1,0 +1,196 @@
+/* RAG Chatbot Platform — Design Tokens */
+/* Import this file into Pencil.dev as CSS Variables */
+
+:root {
+  /* COLORS — Primary (red accent ramp) */
+  --color-primary-50:  #ffebe9;
+  --color-primary-100: #ffcecb;
+  --color-primary-200: #ffaba8;
+  --color-primary-300: #ff8182;
+  --color-primary-400: #fa4549;
+  --color-primary-500: #e5484d;
+  --color-primary-600: #cf222e;
+  --color-primary-700: #a40e26;
+  --color-primary-800: #82071e;
+  --color-primary-900: #660018;
+
+  /* COLORS — Neutral (GitHub light ramp) */
+  --color-gray-50:  #f6f8fa;
+  --color-gray-100: #eaeef2;
+  --color-gray-200: #d0d7de;
+  --color-gray-300: #afb8c1;
+  --color-gray-400: #8c959f;
+  --color-gray-500: #6e7681;
+  --color-gray-600: #57606a;
+  --color-gray-700: #424a53;
+  --color-gray-800: #32383f;
+  --color-gray-900: #24292f;
+
+  /* COLORS — Semantic (flip in dark, see html.dark) */
+  --canvas: #ffffff;
+  --surface: #f6f8fa;
+  --surface-2: #eaeef2;
+  --border: #d0d7de;
+  --border-muted: #d8dee4;
+  --fg: #1f2328;
+  --fg-muted: #59636e;
+  --fg-faint: #818b98;
+  --accent: #cf222e;
+  --accent-hover: #a40e26;
+  --accent-fg: #ffffff;
+  --accent-subtle: #ffebe9;
+  --accent-border: #ffc1bc;
+  --link: #cf222e;
+  --ring: rgba(207, 34, 46, .40);
+
+  /* COLORS — Status */
+  --color-success: #1a7f37;
+  --color-success-light: #dafbe1;
+  --color-warning: #9a6700;
+  --color-warning-light: #fff8c5;
+  --color-danger: #cf222e;
+  --color-danger-light: #ffebe9;
+  --color-info: #0969da;
+  --color-info-light: #ddf4ff;
+
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+  --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-base: 1rem;     /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 1.875rem;  /* 30px */
+  --font-size-4xl: 2.25rem;   /* 36px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ============================================
+     SPACING
+     ============================================ */
+  --space-0: 0;
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+
+  /* ============================================
+     BORDERS
+     ============================================ */
+  --radius-none: 0;
+  --radius-sm: 0.375rem;   /* 6px */
+  --radius-md: 0.5rem;     /* 8px */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
+  --radius-2xl: 1.5rem;    /* 24px */
+  --radius-full: 9999px;
+
+  --border-width-thin: 1px;
+  --border-width-medium: 2px;
+  --border-width-thick: 4px;
+
+  --border-color: var(--color-gray-200);
+  --border-color-focus: var(--accent);
+
+  /* ============================================
+     SHADOWS
+     ============================================ */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  /* ============================================
+     LAYOUT
+     ============================================ */
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 64px;
+  --topbar-height: 64px;
+  --content-max-width: 1280px;
+
+  /* ============================================
+     TRANSITIONS
+     ============================================ */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+
+  /* ============================================
+     Z-INDEX
+     ============================================ */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
+}
+
+/* ============================================
+   DARK MODE — semantic tokens flip here, and the
+   gray ramp is overridden so light-only pages that
+   use gray-* become correct without per-component
+   dark: variants. Components migrated to semantic
+   tokens must NOT also carry dark:gray variants.
+   ============================================ */
+html.dark {
+  /* GitHub-style elevation: page (surface) sits BELOW raised surfaces (canvas).
+     Page #0d1117 → cards/modals/inputs #161b22 → hover/tiles #21262d. */
+  --canvas: #161b22;
+  --surface: #0d1117;
+  --surface-2: #21262d;
+  --border: #30363d;
+  --border-muted: #21262d;
+  --fg: #e6edf3;
+  --fg-muted: #8b949e;
+  --fg-faint: #6e7681;
+  --accent: #da3633;
+  --accent-hover: #f85149;
+  --accent-fg: #ffffff;
+  --accent-subtle: #2d1213;
+  --accent-border: #5c2123;
+  --link: #ff7b72;
+  --ring: rgba(248, 81, 73, .40);
+
+  --color-success: #3fb950;
+  --color-success-light: #122118;
+  --color-warning: #d29922;
+  --color-warning-light: #2a2110;
+  --color-danger: #f85149;
+  --color-danger-light: #2d1213;
+  --color-info: #58a6ff;
+  --color-info-light: #0c2d4a;
+
+  /* gray ramp inverted for dark (low = bg, high = text) */
+  --color-gray-50:  #161b22;
+  --color-gray-100: #21262d;
+  --color-gray-200: #30363d;
+  --color-gray-300: #424a53;
+  --color-gray-400: #6e7681;
+  --color-gray-500: #8b949e;
+  --color-gray-600: #b1bac4;
+  --color-gray-700: #c9d1d9;
+  --color-gray-800: #d8dee4;
+  --color-gray-900: #e6edf3;
+}

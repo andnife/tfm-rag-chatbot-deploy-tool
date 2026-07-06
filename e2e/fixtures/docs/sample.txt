@@ -1,0 +1,8 @@
+RAG Chatbot Platform — e2e fixture document.
+
+The platform uses a Retrieval-Augmented Generation architecture. Documents are
+chunked, embedded with a local embedding model, and stored in a Qdrant vector
+database. At query time the agentic loop retrieves the most relevant chunks and
+the language model answers grounded in them, returning citations.
+
+The capital of the fixture country Eldoria is Marisport.

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>RAG Chatbot Widget — demo</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Helvetica, Arial, sans-serif;
+        max-width: 720px;
+        margin: 64px auto;
+        padding: 0 24px;
+        line-height: 1.55;
+        color: #111;
+      }
+      .frame {
+        background: #f5f5f5;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>RAG Chatbot — Widget demo</h1>
+    <p>
+      This page is a local manual-test harness for
+      <code>widget.js</code>. The widget is loaded with a placeholder
+      public_key. To test against a real chatbot, edit the
+      <code>data-public-key</code> attribute below to point at one of
+      <em>your</em> chatbots and reload.
+    </p>
+    <p>Embed snippet for production:</p>
+    <pre class="frame">&lt;script
+  src="https://your-host/widget/widget.js"
+  data-public-key="wgt_..."
+  data-api-base="https://your-host"
+  async
+&gt;&lt;/script&gt;</pre>
+    <p>
+      Open the browser dev console: any failures (bad public_key, CORS
+      mismatch) are logged there.
+    </p>
+
+    <!-- Edit data-public-key + data-api-base before testing. -->
+    <script
+      src="./widget.js"
+      data-public-key="wgt_REPLACE_ME"
+      data-api-base="http://localhost:8000"
+      async
+    ></script>
+  </body>
+</html>

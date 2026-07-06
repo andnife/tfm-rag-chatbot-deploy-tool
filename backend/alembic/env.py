@@ -1,0 +1,69 @@
+import asyncio
+from logging.config import fileConfig
+
+from sqlalchemy import pool
+from sqlalchemy.ext.asyncio import async_engine_from_config
+
+from alembic import context
+from tfm_rag.infrastructure.persistence.base import Base
+
+# Import all ORM model modules so Base.metadata sees them for autogenerate
+from tfm_rag.infrastructure.persistence.models import (
+    chat_messages,  # noqa: F401
+    chat_sessions,  # noqa: F401
+    chatbot_knowledge_base,  # noqa: F401
+    chatbots,  # noqa: F401
+    eval_datasets,  # noqa: F401
+    eval_runs,  # noqa: F401
+    ingestion_jobs,  # noqa: F401
+    knowledge_bases,  # noqa: F401
+    provider_credentials,  # noqa: F401
+    sources,  # noqa: F401
+    tenants,  # noqa: F401
+    users,  # noqa: F401
+)
+from tfm_rag.infrastructure.settings import get_settings
+
+config = context.config
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+settings = get_settings()
+config.set_main_option("sqlalchemy.url", settings.postgres_url)
+
+target_metadata = Base.metadata
+
+
+def run_migrations_offline() -> None:
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def do_run_migrations(connection) -> None:
+    context.configure(connection=connection, target_metadata=target_metadata)
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_migrations_online() -> None:
+    connectable = async_engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+    await connectable.dispose()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    asyncio.run(run_migrations_online())

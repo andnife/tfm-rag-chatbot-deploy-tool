@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RAG Chatbot Platform evaluation dataset row",
+  "type": "object",
+  "required": ["question", "ground_truth", "reference_contexts", "scenario", "complexity", "metadata"],
+  "properties": {
+    "question": {"type": "string", "minLength": 5},
+    "ground_truth": {"type": "string", "minLength": 1},
+    "reference_contexts": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1
+    },
+    "scenario": {"type": "string", "enum": ["doc_only", "sql_only", "mixed", "abstain"]},
+    "complexity": {"type": "string", "enum": ["factual", "inferencial", "comparativa"]},
+    "metadata": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": {"type": "string"},
+        "loader": {"type": "string", "enum": ["pdf", "txt", "docx", "csv", "md", "sql"]}
+      }
+    },
+    "sql_reference": {"type": "string"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"scenario": {"const": "sql_only"}}},
+      "then": {"required": ["sql_reference"]}
+    }
+  ]
+}

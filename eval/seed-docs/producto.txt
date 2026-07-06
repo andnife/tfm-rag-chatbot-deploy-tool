@@ -1,0 +1,24 @@
+RAG Platform — Resumen del producto
+
+Plataforma para crear chatbots inteligentes basados en RAG (Retrieval-Augmented
+Generation). El usuario sube documentos PDF/TXT y opcionalmente conecta bases
+de datos SQL. La plataforma divide el contenido en chunks, los vectoriza con
+embeddings y permite al chatbot recuperar el contexto relevante en cada turno.
+
+Caracteristicas:
+- Multi-tenant: cada usuario tiene su propio espacio aislado.
+- Knowledge Bases organizan los documentos.
+- Soporte para PDF, TXT y bases de datos SQL (PostgreSQL, MySQL).
+- Chatbots configurables con LLM, retrieval y widget embebible.
+- Widget JS integrable en cualquier web mediante un snippet.
+
+Arquitectura: FastAPI + SQLAlchemy + Postgres + Qdrant + Ollama.
+
+El pipeline del chatbot expone cuatro herramientas:
+- search_docs: busca chunks relevantes en las knowledge bases asignadas.
+- query_database: ejecuta consultas SQL contra fuentes conectadas.
+- final_answer: genera la respuesta final usando el contexto recuperado.
+- abstain: se niega a responder si no hay información suficiente.
+
+El modo agéntico (agentic_mode) permite al LLM decidir cuándo invocar cada
+herramienta y cuántas iteraciones realizar (hasta max_retrieval_iterations).

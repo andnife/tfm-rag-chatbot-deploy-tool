@@ -1,0 +1,119 @@
+name: tfm-rag-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tfm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tfm}
+      POSTGRES_DB: ${POSTGRES_DB:-tfm_rag}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tfm} -d ${POSTGRES_DB:-tfm_rag}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/6333'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Sample MySQL source for demoing the SQL-source connector. Not part of a
+  # real deploy's default stack — start it explicitly with:
+  #   docker compose -f docker-compose.prod.yml --profile demo up -d
+  mysql_source:
+    image: mysql:8.0
+    restart: unless-stopped
+    profiles: ["demo"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tfm_rag_source_test}
+      MYSQL_USER: ${MYSQL_USER:-tfm}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tfm}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_source_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpw}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./seed/ollama_pull.sh:/seed/ollama_pull.sh:ro
+    entrypoint: >
+      sh -c "ollama serve & sleep 3 && /seed/ollama_pull.sh && wait"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_URL: "postgresql+asyncpg://${POSTGRES_USER:-tfm}:${POSTGRES_PASSWORD:-tfm}@postgres:5432/${POSTGRES_DB:-tfm_rag}"
+      QDRANT_URL: "http://qdrant:6333"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      COOKIE_SECURE: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  ollama_data:
+  mysql_source_data:

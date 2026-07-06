@@ -1,0 +1,252 @@
+"""Public widget endpoints — no JWT, identified by chatbot.public_key.
+
+Routes:
+  - GET  /api/public/chatbots/{public_key}/config
+  - POST /api/public/chatbots/{public_key}/chat  (Task 2 of plan #16)
+
+The TenantScopingMiddleware lets `/api/public/*` through without parsing
+a JWT (and sets request.state.ctx = None). Each route MUST derive the
+tenant from the resolved chatbot row and build its own RequestContext.
+
+The public surface (`/api/public/*`) is also rate-limited — see
+`_make_rate_limit_dependency` below (Task 4 / T2).
+
+The app-level CORS policy for `/api/public/*` stays permissive at the
+preflight level (see `PathScopedCORSMiddleware`); the actual response
+header is narrowed per-chatbot via `resolve_allowed_origin` (see
+`application/chat/widget_cors.py`).
+"""
+from math import ceil
+from typing import Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tfm_rag.application.chat.widget_cors import resolve_allowed_origin
+from tfm_rag.application.chatbot_config.get_chatbot_by_public_key import (
+    PublicKeyChatbotView,
+    PublicKeyNotFoundError,
+    get_chatbot_by_public_key,
+)
+from tfm_rag.domain.value_objects.widget_config import WidgetConfig
+from tfm_rag.infrastructure.api.dependencies import get_session
+from tfm_rag.infrastructure.api.rate_limiting import TokenBucketRateLimiter
+from tfm_rag.infrastructure.persistence.repositories.chatbots_repo import (
+    ChatbotRepository,
+)
+from tfm_rag.infrastructure.persistence.repository import RequestContext
+from tfm_rag.infrastructure.settings import Settings, get_settings
+
+router = APIRouter(prefix="/api/public/chatbots", tags=["public-widget"])
+
+
+# --- rate limiting (Task 4 / T2) ----------------------------------------------
+#
+# In-process token bucket, keyed by (route, public_key, client IP). See
+# `infrastructure.api.rate_limiting` for the multi-worker caveat (state is
+# per-process, not shared/distributed across workers or replicas).
+
+_rate_limiter: TokenBucketRateLimiter | None = None
+
+
+def _get_rate_limiter(settings: Settings) -> TokenBucketRateLimiter:
+    global _rate_limiter
+    if _rate_limiter is None:
+        _rate_limiter = TokenBucketRateLimiter(
+            rate_per_minute=settings.public_chat_rate_per_minute,
+            burst=settings.public_chat_burst,
+        )
+    return _rate_limiter
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _make_rate_limit_dependency(bucket_prefix: str) -> Any:
+    """Build a FastAPI dependency enforcing a separate rate-limit budget
+    per `bucket_prefix` (e.g. "chat" vs "config"), so hammering one route
+    doesn't exhaust the other's budget for the same chatbot/IP.
+    """
+
+    async def _dependency(
+        request: Request,
+        public_key: str,
+        settings: Settings = Depends(get_settings),  # noqa: B008
+    ) -> None:
+        limiter = _get_rate_limiter(settings)
+        key = f"{bucket_prefix}:{public_key}:{_client_ip(request)}"
+        retry_after = limiter.try_acquire(key)
+        if retry_after is not None:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="rate limit exceeded, try again later",
+                headers={"Retry-After": str(max(1, ceil(retry_after)))},
+            )
+
+    return _dependency
+
+
+rate_limit_chat = _make_rate_limit_dependency("chat")
+rate_limit_config = _make_rate_limit_dependency("config")
+
+
+# --- helpers ------------------------------------------------------------------
+
+# `ChatbotRepository.get_by_public_key` (used below) is intentionally
+# tenant-agnostic — the public_key IS the security boundary for this
+# lookup, not tenant_id (see its docstring). `BaseRepository` still
+# requires a `RequestContext` to construct, so this sentinel exists purely
+# to satisfy that constructor; its `tenant_id` is never read by the method
+# we call. The real, request-specific `RequestContext` is built afterwards
+# (once `view.tenant_id` is known) for any tenant-scoped work downstream.
+_UNSCOPED_LOOKUP_CTX = RequestContext(tenant_id=UUID(int=0), user_id=None)
+
+
+async def _load_or_404(
+    session: AsyncSession, public_key: str
+) -> PublicKeyChatbotView:
+    repo = ChatbotRepository(session, _UNSCOPED_LOOKUP_CTX)
+    try:
+        return await get_chatbot_by_public_key(
+            public_key=public_key,
+            chatbot_repo=repo,
+        )
+    except PublicKeyNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+def _apply_cors(
+    response: Response, request: Request, widget_cfg: WidgetConfig
+) -> None:
+    origin = request.headers.get("origin")
+    allowed = resolve_allowed_origin(
+        request_origin=origin, allowed_origins=widget_cfg.allowed_origins
+    )
+    if allowed is not None:
+        response.headers["Access-Control-Allow-Origin"] = allowed
+        # Allow credentials so the widget can later carry first-party cookies
+        # if we ever add an alternative session backend. Vary on Origin so
+        # caching is correct.
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Vary"] = "Origin"
+
+
+# --- GET /config --------------------------------------------------------------
+
+
+class PublicConfigOut(BaseModel):
+    chatbot_id: str
+    name: str
+    widget: dict[str, Any]
+
+
+@router.get(
+    "/{public_key}/config",
+    response_model=PublicConfigOut,
+    dependencies=[Depends(rate_limit_config)],
+)
+async def widget_config_(
+    public_key: str,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> PublicConfigOut:
+    view = await _load_or_404(session, public_key)
+    widget_cfg = WidgetConfig.from_dict(view.widget_config)
+    _apply_cors(response, request, widget_cfg)
+    return PublicConfigOut(
+        chatbot_id=str(view.id),
+        name=view.name,
+        widget=widget_cfg.to_dict(),
+    )
+
+
+# --- POST /chat ---------------------------------------------------------------
+
+from tfm_rag.application.chat.answer_query import answer_query  # noqa: E402
+from tfm_rag.infrastructure.api.composition import (  # noqa: E402
+    build_answer_query_deps,
+)
+from tfm_rag.infrastructure.api.routers.chatbots import ChatOut  # noqa: E402
+from tfm_rag.infrastructure.persistence.models.chat_sessions import (  # noqa: E402
+    ChatSessionRow,
+)
+from tfm_rag.infrastructure.vector_store.qdrant_client import QdrantStore  # noqa: E402
+
+
+class PublicChatIn(BaseModel):
+    session_id: str | None = None
+    public_session_cookie: str
+    message: str = Field(..., min_length=1, max_length=8000)
+
+
+@router.post(
+    "/{public_key}/chat",
+    response_model=ChatOut,
+    dependencies=[Depends(rate_limit_chat)],
+)
+async def public_chat_(
+    public_key: str,
+    body: PublicChatIn,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> ChatOut:
+    view = await _load_or_404(session, public_key)
+    widget_cfg = WidgetConfig.from_dict(view.widget_config)
+    _apply_cors(response, request, widget_cfg)
+
+    # --- session_id + cookie verification ----------------------------------
+    parsed_session_id: UUID | None = None
+    if body.session_id:
+        try:
+            parsed_session_id = UUID(body.session_id)
+        except ValueError as exc:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"session_id is not a valid UUID: {body.session_id!r}",
+            ) from exc
+
+        # Verify cookie matches the persisted row.
+        from sqlalchemy import select  # noqa: PLC0415
+
+        stmt = select(ChatSessionRow).where(
+            ChatSessionRow.id == parsed_session_id,
+            ChatSessionRow.chatbot_id == view.id,
+        )
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, detail="session not found",
+            )
+        if row.origin != "widget":
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="session origin mismatch (not a widget session)",
+            )
+        if row.public_session_cookie != body.public_session_cookie:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, detail="invalid session cookie",
+            )
+
+    # --- ctx for downstream tenant-scoped operations -----------------------
+    ctx = RequestContext(tenant_id=view.tenant_id, user_id=None)
+
+    qdrant = QdrantStore(settings.qdrant_url, settings.qdrant_api_key)
+    try:
+        result = await answer_query(
+            **build_answer_query_deps(session, ctx, settings, qdrant),
+            chatbot_id=view.id,
+            session_id=parsed_session_id,
+            user_message=body.message,
+            session_origin="widget",
+            public_session_cookie=body.public_session_cookie,
+        )
+    finally:
+        await qdrant.close()
+
+    return ChatOut.from_view(result)

@@ -1,0 +1,10 @@
+sku,name,category,price_eur,weight_limit_kg,warranty_years,colours_available
+EH-C100,Baseline Task Chair,Chair,249.00,120,5,"Black, Anthracite"
+EH-C200,ProComfort Task Chair,Chair,449.00,130,5,"Black, Midnight Blue, Warm Grey"
+EH-C300,Executive ErgoFlex Chair,Chair,849.00,150,5,"Black leather, Black mesh, Cognac leather"
+EH-D400,DeskRise Single-Motor,Desk,599.00,80,5,"White, Black, Oak"
+EH-D500,DeskRise Dual-Motor,Desk,899.00,120,5,"White, Black, Oak, Walnut"
+EH-A10,Single Monitor Arm,Accessory,89.00,,1,N/A
+EH-A20,Dual Monitor Arm,Accessory,139.00,,1,N/A
+EH-A30,Under-Desk Cable Tray,Accessory,29.00,,1,N/A
+EH-A40,Keyboard Tray,Accessory,59.00,,1,N/A

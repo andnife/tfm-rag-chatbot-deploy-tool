@@ -466,4 +466,6 @@ desechable. Reconstruye con `docker compose down -v && bash scripts/setup.sh`.
 
 ## Licencia
 
-**GNU Affero General Public License v3.0 (AGPL-3.0)**. Ver [`LICENSE`](LICENSE).
+El código original de este proyecto se distribuye bajo la **GNU Affero General Public License v3.0 (AGPL-3.0)**. Ver [`LICENSE`](LICENSE).
+
+Las bibliotecas y dependencias de terceros que el proyecto integra (FastAPI, SQLAlchemy, el cliente de Qdrant, Next.js y el resto de paquetes declarados en `backend/pyproject.toml` y `frontend/package.json`) conservan sus respectivas licencias, indicadas en cada paquete. Publicar este repositorio bajo AGPL-3.0 no altera las licencias de esas dependencias.

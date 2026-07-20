@@ -59,6 +59,24 @@ async def test_sql_results_instruct_authoritative_answer() -> None:
 
 
 @pytest.mark.asyncio
+async def test_docs_prompt_instructs_no_info_sentinel() -> None:
+    """The docs synthesis prompt must instruct the model to emit the exact
+    NO_INFO sentinel (not free-form "I don't have that") when the answer isn't
+    in the material, so the orchestrator can redirect to unified abstention."""
+    from tfm_rag.application.chat.synthesize import NO_INFO_SENTINEL
+
+    llm = _FakeLLM("ans")
+    await synthesize_answer(
+        llm=llm, base_url="http://x", api_key=None, model_id="m",
+        generation=GenerationConfig(), route=ROUTE_DOCS,
+        system_prompt="be helpful", user_message="q",
+        chunks=[_chunk("relevant text")], sql_contexts=None,
+    )
+    system = llm.calls[0]["messages"][0]["content"]
+    assert NO_INFO_SENTINEL in system
+
+
+@pytest.mark.asyncio
 async def test_docs_only_omits_sql_instruction() -> None:
     """A docs-only answer (no SQL results) keeps the document prompt untouched."""
     llm = _FakeLLM("ans")

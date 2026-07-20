@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 from uuid import UUID
 
+from tfm_rag.application.chat.abstain import AbstainCause, generate_abstention
 from tfm_rag.application.chat.append_message import append_message as _real_append_message
 from tfm_rag.application.chat.create_session import create_session as _real_create_session
 from tfm_rag.application.chat.generate_sql import (
@@ -16,7 +17,7 @@ from tfm_rag.application.chat.metering import MeteringLLM, TokenMeter
 from tfm_rag.application.chat.retrieve_docs import retrieve_docs as _real_retrieve_docs
 from tfm_rag.application.chat.route import evaluate_route
 from tfm_rag.application.chat.routing_context import build_routing_context, doc_label
-from tfm_rag.application.chat.synthesize import synthesize_answer
+from tfm_rag.application.chat.synthesize import NO_INFO_SENTINEL, synthesize_answer
 from tfm_rag.application.chat.system_prompt import render_sql_schema
 from tfm_rag.application.chat.touch_session import touch_session as _real_touch_session
 from tfm_rag.application.integrations.endpoint_resolver import resolve_inference_target
@@ -403,19 +404,37 @@ async def answer_query(
         await _emit("grade", sufficient=sufficient)
 
     # --- Abstain decision (normal never abstains) ---
-    abstain_reason: str | None = None
+    # Which cause fits, so the unified message can state *why* it can't answer.
+    abstain_cause: AbstainCause | None = None
+    abstain_detail: str | None = None
     if (decision.route != ROUTE_NORMAL
             and pipeline.abstain_when_insufficient and not sufficient):
-        abstain_reason = (
-            verdicts[-1].abstain_reason if verdicts and verdicts[-1].abstain_reason
-            else "The available knowledge did not contain enough to answer."
+        if decision.route == ROUTE_BOTH:
+            abstain_cause = AbstainCause.BOTH_INSUFFICIENT
+        elif decision.route == ROUTE_SQL:
+            abstain_cause = AbstainCause.SQL_NO_DATA
+        else:
+            abstain_cause = AbstainCause.DOCS_INSUFFICIENT
+        if verdicts and verdicts[-1].abstain_reason:
+            abstain_detail = verdicts[-1].abstain_reason
+
+    async def _abstain(cause: AbstainCause, detail: str | None) -> str:
+        """All abstention paths converge here: one LLM-generated message, in the
+        conversation's language, with the bot persona and the cause context."""
+        ab_llm, ab_url, ab_key = await _open(ans_sel)
+        return await generate_abstention(
+            llm=ab_llm, base_url=ab_url, api_key=ab_key,
+            model_id=ans_sel.model_id, generation=pipeline.generation,
+            system_prompt=base_system_prompt, user_message=user_message,
+            cause=cause, detail=detail,
         )
 
     # --- Synthesize ---
-    if abstain_reason is not None:
-        assistant_content = f"I don't know: {abstain_reason}"
-        citations: list[Citation] = []
-        await _emit("synthesize", chars=0, abstained=True)
+    citations: list[Citation] = []
+    if abstain_cause is not None:
+        # Paths 1 & 2: grader-insufficient (docs/both) or SQL returned no data.
+        assistant_content = await _abstain(abstain_cause, abstain_detail)
+        await _emit("synthesize", chars=len(assistant_content), abstained=True)
     else:
         ans_llm, ans_url, ans_key = await _open(ans_sel)
         assistant_content, citations = await synthesize_answer(
@@ -424,7 +443,15 @@ async def answer_query(
             route=decision.route, system_prompt=base_system_prompt,
             user_message=user_message, chunks=chunks, sql_contexts=sql_contexts,
         )
-        await _emit("synthesize", chars=len(assistant_content))
+        if NO_INFO_SENTINEL in assistant_content:
+            # Path 3: the answer LLM declined despite a "sufficient" verdict
+            # (grader false positive). Redirect to the same unified abstention.
+            assistant_content = await _abstain(
+                AbstainCause.SYNTHESIS_DECLINED, None)
+            citations = []
+            await _emit("synthesize", chars=len(assistant_content), abstained=True)
+        else:
+            await _emit("synthesize", chars=len(assistant_content))
 
     trace = RoutingTrace(
         route=decision.route, rationale=decision.rationale,

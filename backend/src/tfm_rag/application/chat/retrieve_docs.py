@@ -3,6 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from tfm_rag.application.integrations.endpoint_resolver import resolve_inference_target
+from tfm_rag.domain.errors.chat import RetrievalError
 from tfm_rag.domain.errors.common import NotFoundError
 from tfm_rag.domain.errors.knowledge import (
     IncompatibleEmbeddingsError,
@@ -94,6 +95,8 @@ async def retrieve_docs(
       - IncompatibleEmbeddingsError if the KBs disagree on embedding_selection.
       - UnsupportedProviderError if the embedder dispatcher has no entry for
         the selection's provider.
+      - RetrievalError if the embedding provider fails (outage/timeout/model
+        missing), so the caller surfaces a clean 502 instead of a raw 500.
     """
     if not query.strip():
         return []
@@ -110,12 +113,18 @@ async def retrieve_docs(
     )
     embedder = dispatcher.for_provider(provider_id)
 
-    vectors = await embedder.embed(
-        base_url=base_url,
-        api_key=api_key,
-        model_id=selection.model_id,
-        texts=[query],
-    )
+    # Embedders raise plain RuntimeError on transport/HTTP/model failures.
+    # Translate to a domain RetrievalError so the API maps it to 502 (as the
+    # LLM path does) rather than letting it escape as an unhandled 500.
+    try:
+        vectors = await embedder.embed(
+            base_url=base_url,
+            api_key=api_key,
+            model_id=selection.model_id,
+            texts=[query],
+        )
+    except RuntimeError as exc:
+        raise RetrievalError(f"Embedding the query failed: {exc}") from exc
     query_vec = vectors[0]
 
     collection = collection_name_for(tenant_id, selection.dim)

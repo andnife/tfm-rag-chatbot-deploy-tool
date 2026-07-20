@@ -6,7 +6,7 @@ import pytest
 
 import tfm_rag.application.chat.retrieve_docs as rd_mod
 from tfm_rag.application.chat.retrieve_docs import retrieve_docs
-from tfm_rag.domain.errors.chat import UnsupportedProviderError
+from tfm_rag.domain.errors.chat import RetrievalError, UnsupportedProviderError
 from tfm_rag.domain.errors.common import NotFoundError
 from tfm_rag.domain.errors.knowledge import (
     IncompatibleEmbeddingsError,
@@ -304,3 +304,39 @@ async def test_retrieve_docs_applies_reranker_when_provided(
     # Qdrant was called with the *initial* top_k (10), not the final (1)
     qcall = qdrant.search.await_args
     assert qcall.kwargs["top_k"] == 10
+
+
+@pytest.mark.asyncio
+async def test_embedder_failure_raises_retrieval_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An embedding-provider outage (embedder raises RuntimeError) must surface
+    as a RetrievalError (→ HTTP 502), not an unhandled RuntimeError (→ 500)."""
+    monkeypatch.setattr(rd_mod, "resolve_inference_target", _fake_resolve_inference_target)
+    ctx = _ctx()
+    kb = _kb(_selection_1024())
+    kb_repo = MagicMock()
+    kb_repo.get_knowledge_base = AsyncMock(return_value=kb)
+
+    embedder = MagicMock()
+    embedder.embed = AsyncMock(side_effect=RuntimeError("Ollama: model not found"))
+    dispatcher = MagicMock()
+    dispatcher.for_provider = MagicMock(return_value=embedder)
+
+    qdrant = MagicMock()
+    qdrant.search = AsyncMock()
+
+    with pytest.raises(RetrievalError):
+        await retrieve_docs(
+            tenant_id=ctx.tenant_id,
+            qdrant=qdrant,
+            dispatcher=dispatcher,
+            kb_repo=kb_repo,
+            **_deps(),
+            kb_ids=[kb.id],
+            query="what is alpha?",
+            top_k=5,
+            score_threshold=None,
+        )
+    # We never reached the vector store because embedding failed first.
+    qdrant.search.assert_not_awaited()

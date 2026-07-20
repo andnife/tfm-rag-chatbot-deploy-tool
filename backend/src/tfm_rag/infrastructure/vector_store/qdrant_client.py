@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
     Distance,
     FieldCondition,
@@ -96,25 +97,34 @@ class QdrantStore:
         if not kb_ids:
             return []
         kb_ids_str = [str(k) for k in kb_ids]
-        response = await self._client.query_points(
-            collection_name=collection,
-            query=query_vector,
-            limit=top_k,
-            score_threshold=score_threshold,
-            query_filter=Filter(
-                must=[
-                    FieldCondition(
-                        key="tenant_id",
-                        match=MatchValue(value=str(tenant_id)),
-                    ),
-                    FieldCondition(
-                        key="kb_id",
-                        match=MatchAny(any=kb_ids_str),
-                    ),
-                ]
-            ),
-            with_payload=True,
-        )
+        try:
+            response = await self._client.query_points(
+                collection_name=collection,
+                query=query_vector,
+                limit=top_k,
+                score_threshold=score_threshold,
+                query_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="tenant_id",
+                            match=MatchValue(value=str(tenant_id)),
+                        ),
+                        FieldCondition(
+                            key="kb_id",
+                            match=MatchAny(any=kb_ids_str),
+                        ),
+                    ]
+                ),
+                with_payload=True,
+            )
+        except UnexpectedResponse as exc:
+            # A never-ingested KB (or one whose embedding dim changed) has no
+            # collection yet. Qdrant answers 404 — that's "no results", not an
+            # outage: degrade to an empty hit list so the pipeline abstains
+            # instead of raising a raw 500. Any other status is a real fault.
+            if exc.status_code == 404:
+                return []
+            raise
         out: list[tuple[str, float, dict[str, Any]]] = []
         for hit in response.points:
             out.append((str(hit.id), float(hit.score), dict(hit.payload or {})))

@@ -94,6 +94,12 @@ class ProviderCredentialRepository(BaseRepository[ProviderCredentialRow]):
         row.min_request_interval_seconds = min_request_interval_seconds
         await self._session.flush()
         await self._session.commit()
+        # `updated_at` carries a SQL-side `onupdate=func.now()`, so after the
+        # UPDATE its ORM value is expired (SQLAlchemy doesn't know the computed
+        # timestamp) even with expire_on_commit=False. Reading it in _to_entity
+        # would trigger a lazy, *synchronous* reload against the async pool and
+        # raise MissingGreenlet. Refresh awaits that reload in the async context.
+        await self._session.refresh(row)
         return self._to_entity(row)
 
     async def delete_credential(self, credential_id: UUID) -> None:

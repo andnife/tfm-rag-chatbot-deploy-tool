@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -28,7 +28,15 @@ export function AddCredentialDialog() {
   const [open, setOpen] = useState(false)
   const providers = useLlmProviders()
   const create = useCreateCredential()
-  const form = useForm<FormData>({ resolver: zodResolver(schema) })
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    // Defined defaults keep the provider Select controlled for the component's
+    // whole lifetime (avoids React's controlled↔uncontrolled warning).
+    defaultValues: {
+      provider_id: '', label: '', api_key: '',
+      base_url: '', max_concurrency: '', min_request_interval_seconds: '',
+    },
+  })
 
   const tenantProviders = providers.data?.filter(p => p.config_source === 'TENANT_CREDENTIAL') ?? []
   const providerId = form.watch('provider_id')
@@ -37,6 +45,36 @@ export function AddCredentialDialog() {
   // concurrency knobs; providers with a fixed endpoint (OpenAI) hide both and
   // use the backend's recommended rate limits.
   const needsBaseUrl = selectedProvider?.requires_base_url_input ?? false
+
+  // Preferred default provider: OpenAI if available, else the first one.
+  const defaultProviderId = tenantProviders.some(p => p.id === 'openai')
+    ? 'openai'
+    : (tenantProviders[0]?.id ?? '')
+
+  // Once providers have loaded, preselect the default while the dialog is open
+  // and nothing is chosen yet (covers the case where providers arrive after the
+  // dialog opened).
+  useEffect(() => {
+    if (open && !form.getValues('provider_id') && defaultProviderId) {
+      form.setValue('provider_id', defaultProviderId, { shouldValidate: true })
+    }
+  }, [open, defaultProviderId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleOpenChange = (next: boolean) => {
+    // Reset to a clean form (default provider preselected) each time it opens,
+    // so a previously chosen provider/values never leak into a new credential.
+    if (next) {
+      form.reset({
+        provider_id: defaultProviderId,
+        label: '',
+        api_key: '',
+        base_url: '',
+        max_concurrency: '',
+        min_request_interval_seconds: '',
+      })
+    }
+    setOpen(next)
+  }
 
   const onSubmit = (data: FormData) => {
     if (needsBaseUrl && !data.base_url?.trim()) {
@@ -63,7 +101,7 @@ export function AddCredentialDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>{t('credentials.addButton')}</Button>
       </DialogTrigger>
@@ -72,7 +110,7 @@ export function AddCredentialDialog() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>{t('credentials.provider')}</Label>
-            <Select onValueChange={(v) => form.setValue('provider_id', v, { shouldValidate: true })}>
+            <Select value={providerId ?? ''} onValueChange={(v) => form.setValue('provider_id', v, { shouldValidate: true })}>
               <SelectTrigger><SelectValue placeholder={t('credentials.selectProvider')} /></SelectTrigger>
               <SelectContent>
                 {tenantProviders.map(p => (

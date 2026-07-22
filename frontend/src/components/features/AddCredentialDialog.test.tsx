@@ -39,12 +39,17 @@ const PROVIDERS: LlmProvider[] = [
   },
 ]
 
-async function openDialogAndSelect(providerLabel: string): Promise<void> {
+// Open the dialog and wait until the default provider (OpenAI) is applied — the
+// managed-provider hint only renders once a fixed-endpoint provider is selected.
+async function openDialog(): Promise<void> {
   fireEvent.click(screen.getByRole('button', { name: 'Añadir credencial' }))
-  const providerTrigger = await screen.findByText('Selecciona...')
-  fireEvent.click(providerTrigger)
+  await screen.findByText(/endpoint fijo y límites de tasa recomendados/i)
+}
+
+async function selectProvider(label: string): Promise<void> {
+  fireEvent.click(screen.getByRole('combobox'))
   const listbox = await screen.findByRole('listbox')
-  fireEvent.click(within(listbox).getByText(providerLabel))
+  fireEvent.click(within(listbox).getByText(label))
 }
 
 describe('AddCredentialDialog', () => {
@@ -56,23 +61,29 @@ describe('AddCredentialDialog', () => {
     })
   })
 
-  it('shows validation errors and never submits until required fields are filled', async () => {
+  it('defaults the provider to OpenAI when opened', async () => {
     renderWithQueryClient(<AddCredentialDialog />)
+    await openDialog()
+    // OpenAI is preselected → its managed-provider hint is shown and there is
+    // no lingering "select a provider" placeholder state.
+    expect(
+      screen.getByText(/endpoint fijo y límites de tasa recomendados/i),
+    ).toBeInTheDocument()
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Añadir credencial' }))
+  it('does not submit until required fields are filled', async () => {
+    renderWithQueryClient(<AddCredentialDialog />)
+    await openDialog()
 
-    const submit = await screen.findByRole('button', { name: 'Guardar' })
-    fireEvent.click(submit)
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
-    expect(await screen.findByText('Selecciona un proveedor')).toBeInTheDocument()
-    expect(screen.getByText('Etiqueta obligatoria')).toBeInTheDocument()
+    // Provider is prefilled (OpenAI); label + api_key are still required.
+    expect(await screen.findByText('Etiqueta obligatoria')).toBeInTheDocument()
     expect(screen.getByText('API key obligatoria')).toBeInTheDocument()
-
-    // The actual create request must never fire while the form is invalid.
     expect(api.apiJson).not.toHaveBeenCalled()
   })
 
-  it('submits the create-credential request once required fields are valid', async () => {
+  it('submits the create-credential request with the default OpenAI provider', async () => {
     vi.mocked(api.apiJson).mockResolvedValue({
       id: 'cred-1',
       provider_id: 'openai',
@@ -84,19 +95,10 @@ describe('AddCredentialDialog', () => {
     })
 
     renderWithQueryClient(<AddCredentialDialog />)
-    fireEvent.click(screen.getByRole('button', { name: 'Añadir credencial' }))
-
-    const providerTrigger = await screen.findByText('Selecciona...')
-    fireEvent.click(providerTrigger)
-    // Radix Select renders a visually-hidden native <select> in addition to
-    // the popper listbox — both contain an "OpenAI" text node, so scope the
-    // query to the open listbox.
-    const listbox = await screen.findByRole('listbox')
-    fireEvent.click(within(listbox).getByText('OpenAI'))
+    await openDialog()
 
     fireEvent.change(screen.getByLabelText('Etiqueta'), { target: { value: 'Mi clave' } })
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-secret' } })
-
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
     await waitFor(() => {
@@ -107,6 +109,7 @@ describe('AddCredentialDialog', () => {
           provider_id: 'openai',
           label: 'Mi clave',
           api_key: 'sk-secret',
+          base_url: null, // OpenAI: no endpoint URL sent
         }),
       )
     })
@@ -114,12 +117,10 @@ describe('AddCredentialDialog', () => {
 
   it('hides base_url + concurrency and shows the managed hint for OpenAI', async () => {
     renderWithQueryClient(<AddCredentialDialog />)
-    await openDialogAndSelect('OpenAI')
+    await openDialog() // OpenAI is the default
 
-    // No endpoint URL nor concurrency knobs for a fixed-endpoint provider.
     expect(screen.queryByLabelText('URL del endpoint')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Concurrencia máxima')).not.toBeInTheDocument()
-    // Instead, the managed-provider hint is shown.
     expect(
       screen.getByText(/endpoint fijo y límites de tasa recomendados/i),
     ).toBeInTheDocument()
@@ -127,9 +128,10 @@ describe('AddCredentialDialog', () => {
 
   it('requires an endpoint URL for OpenAI-compatible providers', async () => {
     renderWithQueryClient(<AddCredentialDialog />)
-    await openDialogAndSelect('OpenAI-compatible endpoint')
+    await openDialog()
+    await selectProvider('OpenAI-compatible endpoint')
 
-    // base_url field is present for a compat provider.
+    // base_url field appears for a compat provider.
     expect(screen.getByLabelText('URL del endpoint')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Etiqueta'), { target: { value: 'Groq' } })

@@ -18,12 +18,23 @@ respuestas fundamentadas y honestas (cita fuentes y se abstiene si no sabe)."
 | Usuario | `demo@fake.com` / `Demo1234` |
 | KB | "Universidad Europea" (4 docs ya ingestados) — `269a91ee-fb60-49ac-a324-7638b22345d5` |
 | Chatbot | "Asistente Universidad Europea" — `3ff4ec3c-8c24-487f-ae0b-45f731a1b416` |
-| Modelo generación | DeepInfra (configúralo con tu API key el día de la demo) |
+| Modelo generación | DeepInfra `Qwen/Qwen2.5-72B-Instruct` (configúralo con tu API key el día de la demo) |
 | Embeddings | Ollama `bge-m3` (local) |
 | Playground (URL directa) | http://localhost:3001/chatbots/3ff4ec3c-8c24-487f-ae0b-45f731a1b416/playground |
 
+> **⚠️ EL MODELO DEBE SOPORTAR *TOOL CALLING*.** El router del motor RAG enruta con una
+> *tool call* forzada (`route_decision`), así que la **primera** llamada al LLM es un *tool
+> call*. Si eliges un modelo sin soporte de *tools* (p. ej. `Mistral-Small-24B`), DeepInfra
+> devuelve `HTTP 405: Tool calling is not supported` → el chat da **502 en toda pregunta**.
+> Usa **`Qwen/Qwen2.5-72B-Instruct`** (el verificado; mejor del sweep). Al re-crear la
+> credencial, comprueba en *Chatbot → edit* que el modelo sigue siendo Qwen (el desplegable
+> puede auto-seleccionar otro modelo del proveedor).
+
 > Re-provisionar la cuenta desde cero (idempotente): `bash scripts/seed-demo-universidad.sh`
-> Smoke test del chat (12 preguntas): `bash scripts/demo-smoke.sh`
+> Smoke test del chat (13 preguntas): `bash scripts/demo-smoke.sh`
+> **Validar el recorrido completo en navegador (login→KB→chatbot→playground) grabando vídeo:**
+> `cd e2e && npx playwright test --config=demo-validate.config.ts` → vídeo + capturas en
+> `e2e/demo-artifacts/` (sirve de screencast de red de seguridad).
 
 ---
 

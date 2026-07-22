@@ -28,9 +28,16 @@
 (function () {
   "use strict";
 
-  const SCRIPT_EL = document.currentScript;
+  // Normally the widget reads config from its own <script> via
+  // document.currentScript. That is null for dynamically-injected scripts
+  // (the "console" delivery snippet), so fall back to locating the tag by its
+  // data-tfm-widget marker (or, last resort, any script carrying a public key).
+  const SCRIPT_EL =
+    document.currentScript ||
+    document.querySelector("script[data-tfm-widget]") ||
+    document.querySelector("script[data-public-key]");
   if (!SCRIPT_EL) {
-    console.error("[tfm-widget] could not find currentScript; aborting");
+    console.error("[tfm-widget] could not find the widget <script> element; aborting");
     return;
   }
 

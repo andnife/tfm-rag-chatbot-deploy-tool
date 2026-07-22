@@ -12,8 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChatbot, useUpdateChatbot, useWelcomeSuggestions } from '@/lib/queries'
 import { ApiError } from '@/lib/api'
+import { buildEmbedSnippet, buildConsoleSnippet } from '@/lib/widget-snippet'
 import type { WidgetConfig } from '@/types/api'
 
 export default function WidgetConfigPage() {
@@ -67,12 +69,15 @@ export default function WidgetConfigPage() {
     })
   }
 
-  const embedSnippet = bot?.public_key
-    ? `<script\n  src="${typeof window !== 'undefined' ? window.location.origin : ''}/widget/widget.js"\n  data-public-key="${bot.public_key}"\n  data-api-base="${typeof window !== 'undefined' ? window.location.origin : ''}"\n  async\n></script>`
-    : ''
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const publicKey = bot?.public_key ?? ''
+  const [snippetMode, setSnippetMode] = useState<'embed' | 'console'>('embed')
+  const embedSnippet = buildEmbedSnippet(origin, publicKey)
+  const consoleSnippet = buildConsoleSnippet(origin, publicKey)
+  const activeSnippet = snippetMode === 'embed' ? embedSnippet : consoleSnippet
 
   const onCopy = () => {
-    navigator.clipboard.writeText(embedSnippet)
+    navigator.clipboard.writeText(activeSnippet)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -180,10 +185,18 @@ export default function WidgetConfigPage() {
           <Card>
             <CardHeader><CardTitle className="text-sm">{t('widget.embedSnippet')}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-xs text-fg-muted">{t('widget.embedHint')}</p>
+              <Tabs value={snippetMode} onValueChange={v => setSnippetMode(v as 'embed' | 'console')}>
+                <TabsList>
+                  <TabsTrigger value="embed">{t('widget.embedTab')}</TabsTrigger>
+                  <TabsTrigger value="console">{t('widget.consoleTab')}</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <p className="text-xs text-fg-muted">
+                {snippetMode === 'embed' ? t('widget.embedHint') : t('widget.consoleHint')}
+              </p>
               <div className="relative">
                 <pre className="bg-gray-900 text-green-400 text-xs p-4 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
-                  {embedSnippet}
+                  {activeSnippet}
                 </pre>
                 <Button
                   size="icon"

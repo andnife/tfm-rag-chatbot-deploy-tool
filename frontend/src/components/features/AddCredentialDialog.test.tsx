@@ -28,7 +28,24 @@ const PROVIDERS: LlmProvider[] = [
     supports_tool_calling: true,
     default_models: ['gpt-4o-mini'],
   },
+  {
+    id: 'openai_compat',
+    display_name: 'OpenAI-compatible endpoint',
+    description: '',
+    config_source: 'TENANT_CREDENTIAL',
+    requires_base_url_input: true,
+    supports_tool_calling: true,
+    default_models: [],
+  },
 ]
+
+async function openDialogAndSelect(providerLabel: string): Promise<void> {
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir credencial' }))
+  const providerTrigger = await screen.findByText('Selecciona...')
+  fireEvent.click(providerTrigger)
+  const listbox = await screen.findByRole('listbox')
+  fireEvent.click(within(listbox).getByText(providerLabel))
+}
 
 describe('AddCredentialDialog', () => {
   beforeEach(() => {
@@ -93,5 +110,36 @@ describe('AddCredentialDialog', () => {
         }),
       )
     })
+  })
+
+  it('hides base_url + concurrency and shows the managed hint for OpenAI', async () => {
+    renderWithQueryClient(<AddCredentialDialog />)
+    await openDialogAndSelect('OpenAI')
+
+    // No endpoint URL nor concurrency knobs for a fixed-endpoint provider.
+    expect(screen.queryByLabelText('URL del endpoint')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Concurrencia máxima')).not.toBeInTheDocument()
+    // Instead, the managed-provider hint is shown.
+    expect(
+      screen.getByText(/endpoint fijo y límites de tasa recomendados/i),
+    ).toBeInTheDocument()
+  })
+
+  it('requires an endpoint URL for OpenAI-compatible providers', async () => {
+    renderWithQueryClient(<AddCredentialDialog />)
+    await openDialogAndSelect('OpenAI-compatible endpoint')
+
+    // base_url field is present for a compat provider.
+    expect(screen.getByLabelText('URL del endpoint')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Etiqueta'), { target: { value: 'Groq' } })
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-x' } })
+    // Submit with an empty base_url → validation blocks it.
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(
+      await screen.findByText(/obligatoria para proveedores compatibles con OpenAI/i),
+    ).toBeInTheDocument()
+    expect(api.apiJson).not.toHaveBeenCalled()
   })
 })

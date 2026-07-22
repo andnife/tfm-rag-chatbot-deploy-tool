@@ -35,6 +35,7 @@ from tfm_rag.domain.catalog.eval_scenarios import (
     SCENARIO_MIXED,
     SCENARIO_SQL_ONLY,
 )
+from tfm_rag.domain.catalog.llm_providers import resolve_rate_limits
 from tfm_rag.domain.errors.common import NotFoundError
 from tfm_rag.domain.ports.secret_encryptor import SecretEncryptor
 from tfm_rag.domain.ports.storage import Storage
@@ -702,6 +703,11 @@ async def _run_entity_eval_in_background(
                         _scoring_t0[0] = time.monotonic()
                         _write_scoring(0)
 
+                judge_max_workers, judge_min_interval = resolve_rate_limits(
+                    judge_provider_id,
+                    cred_max_concurrency=judge_cred.max_concurrency,
+                    cred_min_interval=judge_cred.min_request_interval_seconds,
+                )
                 evaluator = RagasEvaluator(
                     base_url=settings.ollama_base_url,
                     judge_model=row.judge_model,
@@ -709,8 +715,8 @@ async def _run_entity_eval_in_background(
                     judge_provider=judge_provider_id,
                     judge_base_url=judge_base_url,
                     judge_api_key=judge_api_key,
-                    max_workers=judge_cred.max_concurrency,
-                    min_request_interval_seconds=judge_cred.min_request_interval_seconds,
+                    max_workers=judge_max_workers,
+                    min_request_interval_seconds=judge_min_interval,
                     on_judge_progress=_write_scoring,
                 )
                 answer_deps = build_answer_query_deps(session, ctx, settings, qdrant)
@@ -942,6 +948,11 @@ async def calibrate_dataset(
     )
     cal_judge_cred = await credentials_repo.get(body.judge_credential_id)
 
+    cal_max_workers, cal_min_interval = resolve_rate_limits(
+        cal_judge_provider_id,
+        cred_max_concurrency=cal_judge_cred.max_concurrency,
+        cred_min_interval=cal_judge_cred.min_request_interval_seconds,
+    )
     evaluator = RagasEvaluator(
         base_url=settings.ollama_base_url,
         judge_model=body.judge_model,
@@ -949,8 +960,8 @@ async def calibrate_dataset(
         judge_provider=cal_judge_provider_id,
         judge_base_url=cal_judge_base_url,
         judge_api_key=cal_judge_api_key,
-        max_workers=cal_judge_cred.max_concurrency,
-        min_request_interval_seconds=cal_judge_cred.min_request_interval_seconds,
+        max_workers=cal_max_workers,
+        min_request_interval_seconds=cal_min_interval,
     )
     answer_deps = build_answer_query_deps(session, ctx, settings, qdrant)
     t0 = time.monotonic()

@@ -13,6 +13,12 @@ class LLMProviderDescriptor:
     requires_base_url_input: bool
     supports_tool_calling: bool
     default_models: tuple[str, ...] = field(default_factory=tuple)
+    # Recommended rate limits applied when a credential leaves them unset. Only
+    # meaningful for providers with well-known limits (OpenAI). Consumed by the
+    # evaluation judge via `resolve_rate_limits`; None = fall back to the global
+    # default. Not used to throttle live chat.
+    recommended_max_concurrency: int | None = None
+    recommended_min_request_interval_seconds: float | None = None
 
 
 LLM_PROVIDER_CATALOG: dict[str, LLMProviderDescriptor] = {
@@ -33,6 +39,9 @@ LLM_PROVIDER_CATALOG: dict[str, LLMProviderDescriptor] = {
         requires_base_url_input=False,
         supports_tool_calling=True,
         default_models=("gpt-4o-mini", "gpt-4o"),
+        # OpenAI's tiers comfortably handle this; 429s are retried. Conservative
+        # so it is safe across account tiers without being prompted for.
+        recommended_max_concurrency=8,
     ),
     "openai_compat": LLMProviderDescriptor(
         id="openai_compat",
@@ -47,3 +56,34 @@ LLM_PROVIDER_CATALOG: dict[str, LLMProviderDescriptor] = {
         default_models=(),
     ),
 }
+
+
+def resolve_rate_limits(
+    provider_id: str,
+    *,
+    cred_max_concurrency: int | None,
+    cred_min_interval: float | None,
+) -> tuple[int | None, float | None]:
+    """Effective judge rate limits for a credential.
+
+    Precedence: an explicit credential value wins; otherwise the provider's
+    recommended default (OpenAI); otherwise None, meaning the caller uses its
+    own global default (e.g. RAGAS_MAX_WORKERS). Evaluation-only — this does not
+    throttle live chat generation.
+    """
+    descriptor = LLM_PROVIDER_CATALOG.get(provider_id)
+    max_concurrency = (
+        cred_max_concurrency
+        if cred_max_concurrency is not None
+        else (descriptor.recommended_max_concurrency if descriptor else None)
+    )
+    min_interval = (
+        cred_min_interval
+        if cred_min_interval is not None
+        else (
+            descriptor.recommended_min_request_interval_seconds
+            if descriptor
+            else None
+        )
+    )
+    return max_concurrency, min_interval

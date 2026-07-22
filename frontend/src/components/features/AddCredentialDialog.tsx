@@ -30,14 +30,26 @@ export function AddCredentialDialog() {
   const create = useCreateCredential()
   const form = useForm<FormData>({ resolver: zodResolver(schema) })
 
+  const tenantProviders = providers.data?.filter(p => p.config_source === 'TENANT_CREDENTIAL') ?? []
+  const providerId = form.watch('provider_id')
+  const selectedProvider = tenantProviders.find(p => p.id === providerId)
+  // Providers that need an endpoint URL (openai_compat) also expose the
+  // concurrency knobs; providers with a fixed endpoint (OpenAI) hide both and
+  // use the backend's recommended rate limits.
+  const needsBaseUrl = selectedProvider?.requires_base_url_input ?? false
+
   const onSubmit = (data: FormData) => {
+    if (needsBaseUrl && !data.base_url?.trim()) {
+      form.setError('base_url', { message: t('credentials.validatorBaseUrl') })
+      return
+    }
     create.mutate({
       provider_id: data.provider_id,
       label: data.label,
       api_key: data.api_key,
-      base_url: data.base_url?.trim() || null,
-      max_concurrency: data.max_concurrency?.trim() ? parseInt(data.max_concurrency, 10) : null,
-      min_request_interval_seconds: data.min_request_interval_seconds?.trim() ? parseFloat(data.min_request_interval_seconds) : null,
+      base_url: needsBaseUrl ? (data.base_url?.trim() || null) : null,
+      max_concurrency: needsBaseUrl && data.max_concurrency?.trim() ? parseInt(data.max_concurrency, 10) : null,
+      min_request_interval_seconds: needsBaseUrl && data.min_request_interval_seconds?.trim() ? parseFloat(data.min_request_interval_seconds) : null,
     }, {
       onSuccess: () => {
         toast.success(t('credentials.saved'))
@@ -49,8 +61,6 @@ export function AddCredentialDialog() {
       },
     })
   }
-
-  const tenantProviders = providers.data?.filter(p => p.config_source === 'TENANT_CREDENTIAL') ?? []
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -88,20 +98,29 @@ export function AddCredentialDialog() {
               <p className="text-xs text-danger">{t('credentials.validatorApiKey')}</p>
             )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="base_url">{t('credentials.baseUrl')}</Label>
-            <Input id="base_url" {...form.register('base_url')} placeholder="https://api.openai.com/v1" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="max_concurrency">{t('credentials.maxConcurrency')}</Label>
-            <Input id="max_concurrency" type="number" min={1} {...form.register('max_concurrency')} placeholder={t('credentials.maxConcurrencyPlaceholder')} />
-            <p className="text-xs text-fg-muted">{t('credentials.maxConcurrencyHint')}</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="min_request_interval_seconds">{t('credentials.minInterval')}</Label>
-            <Input id="min_request_interval_seconds" type="number" min={0} step="0.1" {...form.register('min_request_interval_seconds')} placeholder={t('credentials.minIntervalPlaceholder')} />
-            <p className="text-xs text-fg-muted">{t('credentials.minIntervalHint')}</p>
-          </div>
+          {needsBaseUrl ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="base_url">{t('credentials.baseUrl')}</Label>
+                <Input id="base_url" {...form.register('base_url')} placeholder="https://api.groq.com/openai/v1" />
+                {form.formState.errors.base_url && (
+                  <p className="text-xs text-danger">{t('credentials.validatorBaseUrl')}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="max_concurrency">{t('credentials.maxConcurrency')}</Label>
+                <Input id="max_concurrency" type="number" min={1} {...form.register('max_concurrency')} placeholder={t('credentials.maxConcurrencyPlaceholder')} />
+                <p className="text-xs text-fg-muted">{t('credentials.maxConcurrencyHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="min_request_interval_seconds">{t('credentials.minInterval')}</Label>
+                <Input id="min_request_interval_seconds" type="number" min={0} step="0.1" {...form.register('min_request_interval_seconds')} placeholder={t('credentials.minIntervalPlaceholder')} />
+                <p className="text-xs text-fg-muted">{t('credentials.minIntervalHint')}</p>
+              </div>
+            </>
+          ) : selectedProvider ? (
+            <p className="text-xs text-fg-muted">{t('credentials.managedProviderHint')}</p>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
             <Button type="submit" disabled={create.isPending}>
